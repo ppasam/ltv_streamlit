@@ -129,36 +129,35 @@ def load_sales_from_db(start_date: Optional[datetime] = None,
     """Load sales data from database with optional date filtering."""
     db_url = get_database_url()
 
-    try:
-        conn = psycopg2.connect(db_url)
-        cursor = conn.cursor()
-        cursor.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'sales')")
-        table_exists = cursor.fetchone()[0]
-        cursor.close()
-        conn.close()
+    conn = psycopg2.connect(db_url)
+    cursor = conn.cursor()
+    cursor.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'sales')")
+    table_exists = cursor.fetchone()[0]
+    cursor.close()
+    conn.close()
 
-        if not table_exists:
-            return _load_sales_from_excel(start_date, end_date)
+    if not table_exists:
+        create_clients_table()
+        load_sales_data_to_db(source="templates_data")
+        populate_clients_from_sales()
 
-        query = "SELECT * FROM sales"
-        if start_date and end_date:
-            query += f" WHERE purchase_date >= '{start_date.strftime('%Y-%m-%d')}' AND purchase_date <= '{end_date.strftime('%Y-%m-%d')}'"
+    query = "SELECT * FROM sales"
+    if start_date and end_date:
+        query += f" WHERE purchase_date >= '{start_date.strftime('%Y-%m-%d')}' AND purchase_date <= '{end_date.strftime('%Y-%m-%d')}'"
 
-        conn = psycopg2.connect(db_url)
-        df = pd.read_sql(query, conn)
-        conn.close()
+    conn = psycopg2.connect(db_url)
+    df = pd.read_sql(query, conn)
+    conn.close()
 
-        df = df.rename(columns={
-            "purchase_date": "Date",
-            "client_id": "Customer ID",
-            "order_price": "Revenue"
-        })
-        if "Date" in df.columns:
-            df["Date"] = pd.to_datetime(df["Date"])
+    df = df.rename(columns={
+        "purchase_date": "Date",
+        "client_id": "Customer ID",
+        "order_price": "Revenue"
+    })
+    if "Date" in df.columns:
+        df["Date"] = pd.to_datetime(df["Date"])
 
-        return df
-    except Exception:
-        return _load_sales_from_excel(start_date, end_date)
+    return df
 
 
 def _load_sales_from_excel(start_date: Optional[datetime] = None,
@@ -284,9 +283,17 @@ def save_uploaded_data(uploaded_file) -> None:
 
 def load_custom_sales_to_db(uploaded_file) -> None:
     """Load custom sales data to database."""
+    db_url = get_database_url()
+    engine = create_engine(db_url)
+    
+    with engine.connect() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS clients"))
+        conn.commit()
+    
     df = pd.read_excel(uploaded_file)
     df.to_excel(get_download_data_path("sales_template.xlsx"), index=False)
     load_sales_data_to_db(clear=True, source="download_data")
+    populate_clients_from_sales()
 
 
 def load_custom_promotion_costs_to_db(uploaded_file) -> None:
@@ -347,3 +354,149 @@ def load_other_marketing_costs_from_db() -> pd.DataFrame:
         return df
     except Exception:
         return load_other_marketing_costs_data()
+
+
+def create_clients_table() -> None:
+    """Create clients table in PostgreSQL."""
+    db_url = get_database_url()
+    conn = psycopg2.connect(db_url)
+    cur = conn.cursor()
+    
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS clients (
+            client_id BIGINT PRIMARY KEY,
+            num_orders INTEGER,
+            first_order_date DATE,
+            last_order_date DATE,
+            total_amount NUMERIC,
+            first_order_id BIGINT,
+            first_order_channel VARCHAR,
+            cohort VARCHAR
+        )
+    """)
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def add_cohort_to_sales() -> None:
+    """Add cohort column to sales table if not exists and populate it."""
+    db_url = get_database_url()
+    conn = psycopg2.connect(db_url)
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'sales' AND column_name = 'cohort'
+    """)
+    exists = cur.fetchone()
+    
+    if not exists:
+        cur.execute("ALTER TABLE sales ADD COLUMN cohort VARCHAR")
+        conn.commit()
+    
+    cur.close()
+    conn.close()
+    
+    clients_df = load_clients_from_db()
+    if clients_df.empty:
+        return
+    
+    client_cohorts = clients_df.set_index("client_id")["cohort"].to_dict()
+    
+    conn = psycopg2.connect(db_url)
+    cur = conn.cursor()
+    
+    for client_id, cohort in client_cohorts.items():
+        if cohort is None:
+            cohort = ""
+        cur.execute("UPDATE sales SET cohort = %s WHERE client_id = %s", (cohort, client_id))
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def save_clients_data(df: pd.DataFrame) -> None:
+    """Save clients data to PostgreSQL."""
+    create_clients_table()
+    db_url = get_database_url()
+    engine = create_engine(db_url)
+    df.to_sql("clients", engine, if_exists="replace", index=False)
+
+
+def load_clients_from_db() -> pd.DataFrame:
+    """Load clients data from PostgreSQL."""
+    db_url = get_database_url()
+    conn = psycopg2.connect(db_url)
+    cur = conn.cursor()
+    cur.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'clients')")
+    table_exists = cur.fetchone()[0]
+    conn.close()
+    
+    if not table_exists:
+        return pd.DataFrame()
+    
+    df = pd.read_sql("SELECT * FROM clients", db_url)
+    return df
+
+
+def populate_clients_from_sales() -> None:
+    """Populate clients table with unique customer IDs from sales."""
+    sales_df = load_sales_from_db()
+    
+    if sales_df.empty or "Customer ID" not in sales_df.columns:
+        return
+    
+    import cohorts as coh
+    
+    sales_df_copy = sales_df.copy()
+    if "order_id" not in sales_df_copy.columns:
+        sales_df_copy["order_id"] = range(1, len(sales_df_copy) + 1)
+    
+    client_stats = sales_df_copy.groupby("Customer ID").agg(
+        num_orders=("Customer ID", "count"),
+        first_order_date=("Date", "min"),
+        last_order_date=("Date", "max"),
+        total_amount=("Revenue", "sum")
+    ).reset_index()
+    
+    first_orders = sales_df_copy.sort_values(["Date", "order_id"]).groupby("Customer ID").first().reset_index()
+    first_orders = first_orders[["Customer ID", "order_id", "acquisition_channel"]]
+    first_orders = first_orders.rename(columns={"order_id": "first_order_id"})
+    
+    client_data = client_stats.merge(first_orders, on="Customer ID", how="left")
+    client_data = client_data.rename(columns={
+        "Customer ID": "client_id",
+        "acquisition_channel": "first_order_channel"
+    })
+    
+    client_data["first_order_date"] = pd.to_datetime(client_data["first_order_date"]).dt.strftime('%Y-%m-%d')
+    client_data["last_order_date"] = pd.to_datetime(client_data["last_order_date"]).dt.strftime('%Y-%m-%d')
+    
+    min_date = sales_df["Date"].min()
+    max_date = sales_df["Date"].max()
+    num_cohorts = 8
+    _, cohort_dates = coh.recalculate_from_num_cohorts(
+        start_date=min_date,
+        end_date=max_date,
+        cohort_type=coh.COHORT_TYPE_MONTHS,
+        num_cohorts=num_cohorts
+    )
+    
+    def get_cohort(date_str):
+        if pd.isna(date_str):
+            return ""
+        date = pd.to_datetime(date_str)
+        for i, cohort_date in enumerate(cohort_dates):
+            if i < len(cohort_dates) - 1:
+                if cohort_date <= date < cohort_dates[i + 1]:
+                    return f"Cohort {i + 1}"
+            else:
+                return f"Cohort {i + 1}"
+        return ""
+    
+    client_data["cohort"] = client_data["first_order_date"].apply(get_cohort)
+    
+    save_clients_data(client_data)
+    add_cohort_to_sales()
