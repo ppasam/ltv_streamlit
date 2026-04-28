@@ -345,30 +345,6 @@ def main() -> None:
         metrics_df = analysis.calculate_overall_metrics(sales_df, promotion_df, marketing_df, clients_df)
         st.dataframe(metrics_df, use_container_width=True, hide_index=True)
 
-        st.divider()
-
-        st.subheader("1. Расходы на привлечение и удержание")
-        promotion_costs_table = analysis.calculate_promotion_costs_table(
-            promotion_df, cohort_dates, num_cohorts, cohort_size, is_days
-        )
-        if not promotion_costs_table.empty:
-            formatted_table = promotion_costs_table.style.format("${:,.2f}")
-            st.dataframe(formatted_table, use_container_width=True)
-        else:
-            st.warning("Нет данных")
-
-        st.divider()
-
-        st.subheader("2. Прочие затраты")
-        marketing_costs_table = analysis.calculate_marketing_costs_table(
-            marketing_df, cohort_dates, num_cohorts, cohort_size, is_days
-        )
-        if not marketing_costs_table.empty:
-            formatted_table = marketing_costs_table.style.format("${:,.2f}")
-            st.dataframe(formatted_table, use_container_width=True)
-        else:
-            st.warning("Нет данных")
-
     elif section == "RFM анализ":
         st.header("RFM анализ")
         st.info("🚧 В разработке")
