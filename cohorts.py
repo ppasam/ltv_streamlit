@@ -164,3 +164,108 @@ def assign_cohort(df: pd.DataFrame, date_column: str,
         )
 
     return df
+
+
+def render_cohort_settings(start_date: datetime, end_date: datetime, current_mode: str = "Cohort Size"):
+    """Render cohort settings in sidebar and return values."""
+    import streamlit as st
+    
+    st.sidebar.header("Cohort Settings")
+    cohort_type = st.sidebar.selectbox(
+        "Type of Cohort Size",
+        [COHORT_TYPE_MONTHS, COHORT_TYPE_DAYS],
+        index=0
+    )
+
+    calculation_mode = st.sidebar.radio(
+        "База расчета",
+        ["Количество дней/месяцев в когорте", "Количество когорт"],
+        index=0 if current_mode == "Cohort Size" else 1
+    )
+    st.session_state.calculation_mode = "Cohort Size" if calculation_mode == "Количество дней/месяцев в когорте" else "Number of Cohorts"
+
+    max_cohort_size = 365 if cohort_type == COHORT_TYPE_DAYS else 24
+
+    if st.session_state.calculation_mode == "Cohort Size":
+        label_size = f"Количество {'дней' if cohort_type == COHORT_TYPE_DAYS else 'месяцев'} в когорте"
+        cohort_size_input = st.sidebar.number_input(
+            label_size,
+            min_value=1,
+            max_value=max_cohort_size,
+            value=st.session_state.cohort_size_input,
+            key="cohort_size_widget"
+        )
+
+        if cohort_size_input != st.session_state.cohort_size_input:
+            num_cohorts_new, cohort_dates = recalculate_from_cohort_size(
+                start_date=start_date,
+                end_date=end_date,
+                cohort_type=cohort_type,
+                cohort_size=cohort_size_input
+            )
+            st.session_state.cohort_size_input = cohort_size_input
+            st.session_state.num_cohorts_input = num_cohorts_new
+            st.session_state._needs_rerun = True
+        else:
+            num_cohorts_new = st.session_state.num_cohorts_input
+
+        st.sidebar.info(f"📊 Рассчитанное количество когорт: **{num_cohorts_new}**")
+    else:
+        num_cohorts_input = st.sidebar.number_input(
+            "Количество когорт",
+            min_value=1,
+            max_value=MAX_COHORTS,
+            value=st.session_state.num_cohorts_input,
+            key="num_cohorts_widget"
+        )
+
+        if num_cohorts_input != st.session_state.num_cohorts_input:
+            cohort_size_new, cohort_dates = recalculate_from_num_cohorts(
+                start_date=start_date,
+                end_date=end_date,
+                cohort_type=cohort_type,
+                num_cohorts=num_cohorts_input
+            )
+            st.session_state.num_cohorts_input = num_cohorts_input
+            st.session_state.cohort_size_input = cohort_size_new
+            st.session_state._needs_rerun = True
+        else:
+            cohort_size_new = st.session_state.cohort_size_input
+
+        cohort_size = cohort_size_new
+        num_cohorts = num_cohorts_input
+        st.sidebar.info(f"📊 Количество {'дней' if cohort_type == COHORT_TYPE_DAYS else 'месяцев'} в когорте: **{cohort_size_new}**")
+
+    cohort_dates = st.session_state.cohort_dates_input
+    if not cohort_dates:
+        _, cohort_dates = recalculate_from_cohort_size(
+            start_date=start_date,
+            end_date=end_date,
+            cohort_type=cohort_type,
+            cohort_size=st.session_state.cohort_size_input
+        )
+
+    st.session_state.prev_cohort_size = st.session_state.cohort_size_input
+    st.session_state.prev_num_cohorts = st.session_state.num_cohorts_input
+
+    cohort_dates = st.session_state.get("cohort_dates_input", [])
+    if not cohort_dates:
+        _, cohort_dates = recalculate_from_cohort_size(
+            start_date=start_date,
+            end_date=end_date,
+            cohort_type=cohort_type,
+            cohort_size=st.session_state.cohort_size_input
+        )
+
+    for i in range(len(cohort_dates)):
+        default_val = cohort_dates[i].strftime('%Y-%m-%d')
+        st.sidebar.text_input(
+            f"Когорта {i + 1}",
+            value=default_val,
+            key=f"cohort_date_{i}_{id(cohort_dates)}",
+            disabled=True
+        )
+
+    is_days = cohort_type != "Cohort Size" or st.session_state.get("_cohort_type_days", False)
+
+    return cohort_type, st.session_state.num_cohorts_input, st.session_state.cohort_size_input, cohort_dates, is_days
