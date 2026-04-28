@@ -1,6 +1,6 @@
 """Data loading module for LTV analysis application."""
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Tuple
 
 import pandas as pd
@@ -138,8 +138,10 @@ def load_sales_from_db(start_date: Optional[datetime] = None,
 
     if not table_exists:
         create_clients_table()
+        create_cohorts_table()
         load_sales_data_to_db(source="templates_data")
         populate_clients_from_sales()
+        populate_cohorts_table()
 
     query = "SELECT * FROM sales"
     if start_date and end_date:
@@ -417,6 +419,64 @@ def add_cohort_to_sales() -> None:
     conn.close()
 
 
+def add_cohort_to_expenses_tables() -> None:
+    """Add cohort column to promotion_costs and other_marketing_costs tables."""
+    db_url = get_database_url()
+    conn = psycopg2.connect(db_url)
+    cur = conn.cursor()
+    
+    tables = ["promotion_costs", "other_marketing_costs"]
+    
+    for table in tables:
+        cur.execute(f"""
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = '{table}' AND column_name = 'cohort'
+        """)
+        exists = cur.fetchone()
+        
+        if not exists:
+            cur.execute(f"ALTER TABLE {table} ADD COLUMN cohort VARCHAR")
+    
+    conn.commit()
+    
+    cohorts_df = load_cohorts_from_db()
+    if cohorts_df.empty:
+        return
+    
+    for table in tables:
+        cur.execute(f"SELECT channels, expenses_date, costs FROM {table}")
+        rows = cur.fetchall()
+        
+        for row in rows:
+            channels, expenses_date, _ = row
+            if not expenses_date:
+                continue
+            
+            cohort_match = ""
+            for _, coh_row in cohorts_df.iterrows():
+                date_start = coh_row["date_start"]
+                date_end = coh_row["date_end"]
+                if isinstance(date_start, str):
+                    date_start = datetime.strptime(date_start, '%Y-%m-%d').date()
+                if isinstance(date_end, str):
+                    date_end = datetime.strptime(date_end, '%Y-%m-%d').date()
+                if isinstance(expenses_date, str):
+                    expenses_date_dt = datetime.strptime(expenses_date, '%Y-%m-%d').date()
+                else:
+                    expenses_date_dt = expenses_date
+                
+                if date_start <= expenses_date_dt <= date_end:
+                    cohort_match = coh_row["cohort"]
+                    break
+            
+            cur.execute(f"UPDATE {table} SET cohort = %s WHERE channels = %s AND expenses_date = %s", 
+                       (cohort_match, channels, expenses_date))
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
 def save_clients_data(df: pd.DataFrame) -> None:
     """Save clients data to PostgreSQL."""
     create_clients_table()
@@ -500,3 +560,87 @@ def populate_clients_from_sales() -> None:
     
     save_clients_data(client_data)
     add_cohort_to_sales()
+    populate_cohorts_table()
+    add_cohort_to_expenses_tables()
+
+
+def create_cohorts_table() -> None:
+    """Create cohorts table in PostgreSQL."""
+    db_url = get_database_url()
+    conn = psycopg2.connect(db_url)
+    cur = conn.cursor()
+    
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS cohorts (
+            cohort VARCHAR PRIMARY KEY,
+            date_start DATE,
+            date_end DATE
+        )
+    """)
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def populate_cohorts_table() -> None:
+    """Populate cohorts table based on cohort calculations."""
+    import cohorts as coh
+    
+    sales_df = load_sales_from_db()
+    if sales_df.empty:
+        return
+    
+    min_date = sales_df["Date"].min()
+    max_date = sales_df["Date"].max()
+    
+    num_cohorts = 8
+    _, cohort_dates = coh.recalculate_from_num_cohorts(
+        start_date=min_date,
+        end_date=max_date,
+        cohort_type=coh.COHORT_TYPE_MONTHS,
+        num_cohorts=num_cohorts
+    )
+    
+    cohorts_data = []
+    for i, start_date in enumerate(cohort_dates):
+        if i < len(cohort_dates) - 1:
+            end_date = cohort_dates[i + 1] - timedelta(days=1)
+        else:
+            end_date = max_date
+        cohorts_data.append({
+            "cohort": f"Cohort {i + 1}",
+            "date_start": start_date.strftime('%Y-%m-%d'),
+            "date_end": end_date.strftime('%Y-%m-%d')
+        })
+    
+    db_url = get_database_url()
+    conn = psycopg2.connect(db_url)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM cohorts")
+    conn.commit()
+    
+    for row in cohorts_data:
+        cur.execute(
+            "INSERT INTO cohorts (cohort, date_start, date_end) VALUES (%s, %s, %s)",
+            (row["cohort"], row["date_start"], row["date_end"])
+        )
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def load_cohorts_from_db() -> pd.DataFrame:
+    """Load cohorts data from PostgreSQL."""
+    db_url = get_database_url()
+    conn = psycopg2.connect(db_url)
+    cur = conn.cursor()
+    cur.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'cohorts')")
+    table_exists = cur.fetchone()[0]
+    conn.close()
+    
+    if not table_exists:
+        return pd.DataFrame()
+    
+    df = pd.read_sql("SELECT * FROM cohorts ORDER BY date_start", db_url)
+    return df

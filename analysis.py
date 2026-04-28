@@ -8,9 +8,13 @@ import pandas as pd
 def calculate_overall_metrics(
     sales_df: pd.DataFrame,
     promotion_df: pd.DataFrame,
-    marketing_df: pd.DataFrame
+    marketing_df: pd.DataFrame,
+    clients_df: pd.DataFrame = None
 ) -> pd.DataFrame:
     """Calculate overall metrics for the dashboard."""
+    if "cohort" in sales_df.columns:
+        sales_df = sales_df[sales_df["cohort"] != ""]
+    
     unique_customers = sales_df["Customer ID"].nunique() if "Customer ID" in sales_df.columns else 0
     num_orders = len(sales_df) if not sales_df.empty else 0
 
@@ -19,12 +23,25 @@ def calculate_overall_metrics(
     period_start_str = period_start.strftime('%Y-%m-%d') if period_start else "N/A"
     period_end_str = period_end.strftime('%Y-%m-%d') if period_end else "N/A"
     avg_orders_per_customer = round(num_orders / unique_customers, 2) if unique_customers > 0 else 0
-    max_orders_per_customer = sales_df.groupby("Customer ID").size().max() if "Customer ID" in sales_df.columns and not sales_df.empty else 0
+    
+    if clients_df is not None and "num_orders" in clients_df.columns:
+        clients_with_cohort = clients_df[clients_df["cohort"] != ""]
+        max_orders_per_customer = int(clients_with_cohort["num_orders"].max()) if not clients_with_cohort.empty else 0
+    else:
+        max_orders_per_customer = sales_df.groupby("Customer ID").size().max() if "Customer ID" in sales_df.columns and not sales_df.empty else 0
+    
     avg_order_price = f"${round(sales_df['Revenue'].mean(), 2):,.2f}" if "Revenue" in sales_df.columns and not sales_df.empty else "$0.00"
     min_order_price = f"${sales_df['Revenue'].min():,.2f}" if "Revenue" in sales_df.columns and not sales_df.empty else "$0.00"
     max_order_price = f"${sales_df['Revenue'].max():,.2f}" if "Revenue" in sales_df.columns and not sales_df.empty else "$0.00"
-    min_revenue_per_customer = f"${sales_df.groupby('Customer ID')['Revenue'].sum().min():,.2f}" if "Customer ID" in sales_df.columns and "Revenue" in sales_df.columns and not sales_df.empty else "$0.00"
-    max_revenue_per_customer = f"${sales_df.groupby('Customer ID')['Revenue'].sum().max():,.2f}" if "Customer ID" in sales_df.columns and "Revenue" in sales_df.columns and not sales_df.empty else "$0.00"
+    
+    if clients_df is not None and "total_amount" in clients_df.columns:
+        clients_with_cohort = clients_df[clients_df["cohort"] != ""]
+        min_revenue_per_customer = f"${clients_with_cohort['total_amount'].min():,.2f}" if not clients_with_cohort.empty else "$0.00"
+        max_revenue_per_customer = f"${clients_with_cohort['total_amount'].max():,.2f}" if not clients_with_cohort.empty else "$0.00"
+    else:
+        min_revenue_per_customer = f"${sales_df.groupby('Customer ID')['Revenue'].sum().min():,.2f}" if "Customer ID" in sales_df.columns and "Revenue" in sales_df.columns and not sales_df.empty else "$0.00"
+        max_revenue_per_customer = f"${sales_df.groupby('Customer ID')['Revenue'].sum().max():,.2f}" if "Customer ID" in sales_df.columns and "Revenue" in sales_df.columns and not sales_df.empty else "$0.00"
+    
     total_revenue = sales_df["Revenue"].sum() if "Revenue" in sales_df.columns and not sales_df.empty else 0
     total_cost = sales_df["cost"].sum() if "cost" in sales_df.columns and not sales_df.empty else 0
     avg_margin = f"{(total_revenue / total_cost - 1) * 100:.2f}%" if total_cost > 0 else "0.00%"
@@ -102,7 +119,7 @@ def calculate_costs_table(
         return pd.DataFrame()
 
     df = df.copy()
-    df["period_end"] = pd.to_datetime(df["period_end"])
+    df["expenses_date"] = pd.to_datetime(df["expenses_date"])
 
     cohort_columns = calculate_cohort_columns(cohort_dates, num_cohorts, cohort_size, is_days)
     table_data = {}
@@ -112,7 +129,7 @@ def calculate_costs_table(
 
     for _, row in df.iterrows():
         channel = row["channels"]
-        period_date = row["period_end"]
+        period_date = row["expenses_date"]
         cost = row["costs"]
 
         for i, cohort_date in enumerate(cohort_dates):
@@ -151,7 +168,7 @@ def calculate_promotion_costs_table(
 ) -> pd.DataFrame:
     """Calculate promotion costs table."""
     if not promotion_df.empty:
-        if "period_end" in promotion_df.columns and "channels" in promotion_df.columns and "costs" in promotion_df.columns:
+        if "expenses_date" in promotion_df.columns and "channels" in promotion_df.columns and "costs" in promotion_df.columns:
             return calculate_costs_table(promotion_df, cohort_dates, num_cohorts, cohort_size, is_days)
     return pd.DataFrame()
 
@@ -165,6 +182,6 @@ def calculate_marketing_costs_table(
 ) -> pd.DataFrame:
     """Calculate marketing costs table."""
     if not marketing_df.empty:
-        if "period_end" in marketing_df.columns and "channels" in marketing_df.columns and "costs" in marketing_df.columns:
+        if "expenses_date" in marketing_df.columns and "channels" in marketing_df.columns and "costs" in marketing_df.columns:
             return calculate_costs_table(marketing_df, cohort_dates, num_cohorts, cohort_size, is_days)
     return pd.DataFrame()

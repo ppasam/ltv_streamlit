@@ -254,7 +254,7 @@ def main() -> None:
         st.markdown("""
         **Поля данных:**
         - `channels` — Название канала (например, Яндекс.Директ, Google Ads)
-        - `period_end` — Дата окончания периода (YYYY-MM-DD)
+        - `expenses_date` — Дата окончания периода (YYYY-MM-DD)
         - `costs` — Сумма расходов
         """)
         col_dl2, col_load2 = st.columns([1, 1])
@@ -286,7 +286,7 @@ def main() -> None:
         st.markdown("""
         **Поля данных:**
         - `channels` — Название канала (например, Email, SMM)
-        - `period_end` — Дата окончания периода (YYYY-MM-DD)
+        - `expenses_date` — Дата окончания периода (YYYY-MM-DD)
         - `costs` — Сумма расходов
         """)
         col_dl3, col_load3 = st.columns([1, 1])
@@ -338,10 +338,11 @@ def main() -> None:
             datetime.combine(selected_end_date, datetime.min.time())
         )
         data_loader.populate_clients_from_sales()
+        clients_df = data_loader.load_clients_from_db()
         promotion_df = data_loader.load_promotion_costs_from_db()
         marketing_df = data_loader.load_other_marketing_costs_from_db()
 
-        metrics_df = analysis.calculate_overall_metrics(sales_df, promotion_df, marketing_df)
+        metrics_df = analysis.calculate_overall_metrics(sales_df, promotion_df, marketing_df, clients_df)
         st.dataframe(metrics_df, use_container_width=True, hide_index=True)
 
         st.divider()
