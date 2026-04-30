@@ -108,6 +108,10 @@ def init_database_from_templates() -> None:
     load_promotion_costs_to_db(clear=True)
     load_other_marketing_costs_to_db(clear=True)
 
+    add_cohort_to_sales()
+    populate_clients_from_sales()
+    add_cohort_to_expenses_tables()
+
 
 def init_database() -> None:
     """Initialize database and load data from Excel templates."""
@@ -123,7 +127,7 @@ def init_database() -> None:
     marketing_df.to_sql("other_marketing_costs", engine, if_exists="replace", index=False)
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_sales_from_db(start_date: Optional[datetime] = None,
                        end_date: Optional[datetime] = None) -> pd.DataFrame:
     """Load sales data from database with optional date filtering."""
@@ -143,15 +147,15 @@ def load_sales_from_db(start_date: Optional[datetime] = None,
         populate_clients_from_sales()
         populate_cohorts_table()
 
-    query = "SELECT * FROM sales"
+    query = "SELECT purchase_date, order_id, order_price, cost, client_id, acquisition_channel, cohort FROM sales"
     if start_date and end_date:
         query += f" WHERE purchase_date >= '{start_date.strftime('%Y-%m-%d')}' AND purchase_date <= '{end_date.strftime('%Y-%m-%d')}'"
 
     conn = psycopg2.connect(db_url)
-    df = pd.read_sql(query, conn)
+    raw_df = pd.read_sql(query, conn)
     conn.close()
 
-    df = df.rename(columns={
+    df = raw_df.rename(columns={
         "purchase_date": "Date",
         "client_id": "Customer ID",
         "order_price": "Revenue"
@@ -398,6 +402,8 @@ def add_cohort_to_sales() -> None:
         conn.commit()
     
     cur.close()
+    
+    cur.close()
     conn.close()
     
     clients_df = load_clients_from_db()
@@ -485,6 +491,7 @@ def save_clients_data(df: pd.DataFrame) -> None:
     df.to_sql("clients", engine, if_exists="replace", index=False)
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_clients_from_db() -> pd.DataFrame:
     """Load clients data from PostgreSQL."""
     db_url = get_database_url()
@@ -630,6 +637,7 @@ def populate_cohorts_table() -> None:
     conn.close()
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_cohorts_from_db() -> pd.DataFrame:
     """Load cohorts data from PostgreSQL."""
     db_url = get_database_url()

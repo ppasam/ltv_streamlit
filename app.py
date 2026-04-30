@@ -47,9 +47,12 @@ def get_date_range() -> tuple[datetime, datetime]:
 
 def main() -> None:
     """Main application function."""
+    print("=== APP.PY STARTING ===")
     start_date, end_date = get_date_range()
+    print(f"Date range: {start_date} to {end_date}")
     
     section, selected_start, selected_end, cohort_type, num_cohorts, cohort_size, cohort_dates, is_days = ui.render_sidebar(start_date, end_date)
+    print(f"Section selected: {section}")
     
     ui.render_section(
         section, selected_start, selected_end,
