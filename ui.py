@@ -178,6 +178,27 @@ def render_overall_analysis(
     metrics_df = analysis.calculate_overall_metrics(sales_df, promotion_df, marketing_df, clients_df)
     st.dataframe(metrics_df, use_container_width=True, hide_index=True)
 
+    st.divider()
+
+    st.subheader("Выручка")
+    cohorts_df = data_loader.load_cohorts_from_db()
+    revenue_table = analysis.calculate_revenue_table(sales_df, cohorts_df)
+    if not revenue_table.empty:
+        formatted_revenue = revenue_table.style.format("{:,.2f}")
+        st.dataframe(formatted_revenue, use_container_width=True)
+    else:
+        st.warning("Нет данных")
+
+    st.divider()
+
+    st.subheader("Расходы на привлечение и удержание")
+    promotion_costs_table = analysis.calculate_promotion_costs_table(promotion_df, cohorts_df)
+    if not promotion_costs_table.empty:
+        formatted_costs = promotion_costs_table.style.format("{:,.2f}")
+        st.dataframe(formatted_costs, use_container_width=True)
+    else:
+        st.warning("Нет данных")
+
 
 def render_rfm_analysis() -> None:
     """Render RFM анализ section."""
