@@ -219,6 +219,16 @@ def render_overall_analysis(
     else:
         st.warning("Нет данных")
 
+    st.divider()
+
+    st.subheader("Прибыль")
+    profit_table = analysis.calculate_profit_table(revenue_table, cost_table, promotion_costs_table, other_costs_table)
+    if not profit_table.empty:
+        formatted_profit = profit_table.style.format("{:,.2f}")
+        st.dataframe(formatted_profit, use_container_width=True)
+    else:
+        st.warning("Нет данных")
+
 
 def render_rfm_analysis() -> None:
     """Render RFM анализ section."""

@@ -266,3 +266,37 @@ def calculate_other_marketing_costs_table(marketing_df: pd.DataFrame, cohorts_df
     marketing_df_result = pd.concat([marketing_df_result, totals_row.to_frame().T])
     
     return marketing_df_result
+
+
+def calculate_profit_table(revenue_df: pd.DataFrame, cost_df: pd.DataFrame, 
+                          promotion_df: pd.DataFrame, marketing_df: pd.DataFrame) -> pd.DataFrame:
+    """Calculate profit table as Revenue - Cost - Promotion Costs - Other Marketing Costs."""
+    if revenue_df.empty:
+        return pd.DataFrame()
+    
+    all_columns = list(revenue_df.columns)
+    channels = list(revenue_df.index)
+    
+    if "ИТОГО" in channels:
+        channels = channels[:-1]
+    
+    table_data = {}
+    for channel in channels:
+        row_data = {}
+        for col in all_columns:
+            revenue_val = revenue_df.loc[channel, col] if col in revenue_df.columns else 0
+            cost_val = cost_df.loc[channel, col] if col in cost_df.columns and channel in cost_df.index else 0
+            promo_val = promotion_df.loc[channel, col] if col in promotion_df.columns and channel in promotion_df.index else 0
+            marketing_val = marketing_df.loc[channel, col] if col in marketing_df.columns and channel in marketing_df.index else 0
+            
+            row_data[col] = revenue_val - cost_val - promo_val - marketing_val
+        
+        table_data[channel] = row_data
+    
+    profit_df = pd.DataFrame(table_data).T
+    
+    totals_row = profit_df.sum()
+    totals_row.name = "ИТОГО"
+    profit_df = pd.concat([profit_df, totals_row.to_frame().T])
+    
+    return profit_df
