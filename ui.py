@@ -197,6 +197,12 @@ def render_overall_analysis(
 
     st.divider()
 
+    fig_profit = plotting.create_profit_by_channel_pie_chart(profit_by_channel_table)
+    if fig_profit:
+        st.plotly_chart(fig_profit, use_container_width=True)
+
+    st.divider()
+
     st.subheader("Количество заказов по каналам привлечения")
     orders_table = analysis.calculate_orders_table(sales_df, cohorts_df)
     orders_by_channel = analysis.calculate_orders_by_channel_table(orders_table)
@@ -205,6 +211,12 @@ def render_overall_analysis(
         st.dataframe(formatted_orders_by_channel, use_container_width=True, hide_index=True)
     else:
         st.warning("Нет данных")
+
+    st.divider()
+
+    fig_orders = plotting.create_orders_by_channel_pie_chart(orders_by_channel)
+    if fig_orders:
+        st.plotly_chart(fig_orders, use_container_width=True)
 
     st.divider()
 
