@@ -249,6 +249,16 @@ def render_overall_analysis(
     else:
         st.warning("Нет данных")
 
+    st.divider()
+
+    st.subheader("Средняя прибыль с заказа")
+    avg_profit_table = analysis.calculate_avg_profit_per_order_table(profit_table, orders_table)
+    if not avg_profit_table.empty:
+        formatted_avg_profit = avg_profit_table.style.format("{:,.2f}")
+        st.dataframe(formatted_avg_profit, use_container_width=True)
+    else:
+        st.warning("Нет данных")
+
 
 def render_rfm_analysis() -> None:
     """Render RFM анализ section."""

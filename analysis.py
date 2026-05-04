@@ -351,6 +351,26 @@ def calculate_orders_table(sales_df: pd.DataFrame, cohorts_df: pd.DataFrame) -> 
     return orders_df
 
 
+def calculate_avg_profit_per_order_table(profit_table: pd.DataFrame, orders_table: pd.DataFrame) -> pd.DataFrame:
+    """Calculate average profit per order as Profit / Orders."""
+    if profit_table.empty or orders_table.empty:
+        return pd.DataFrame()
+    
+    result = orders_table.astype(float).copy()
+    
+    for col in result.columns:
+        for idx in result.index:
+            profit_val = profit_table.loc[idx, col] if idx in profit_table.index and col in profit_table.columns else 0
+            orders_val = orders_table.loc[idx, col] if idx in orders_table.index else 0
+            
+            if orders_val != 0:
+                result.loc[idx, col] = profit_val / orders_val
+            else:
+                result.loc[idx, col] = 0
+    
+    return result
+
+
 def calculate_avg_acquisition_cost_table(promotion_df: pd.DataFrame, orders_table: pd.DataFrame) -> pd.DataFrame:
     """Calculate average acquisition cost per order as Promotion Costs / Orders."""
     if orders_table.empty:
