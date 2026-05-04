@@ -1,6 +1,6 @@
 """UI module for LTV Streamlit application."""
 import io
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 import pandas as pd
@@ -27,14 +27,16 @@ def render_sidebar(start_date: datetime, end_date: datetime) -> tuple:
             "Start Date",
             value=start_date.date(),
             min_value=start_date.date(),
-            max_value=end_date.date()
+            max_value=end_date.date(),
+            key="start_date_input"
         )
     with col_end:
         selected_end_date = st.date_input(
             "End Date",
             value=end_date.date(),
             min_value=start_date.date(),
-            max_value=end_date.date()
+            max_value=end_date.date(),
+            key="end_date_input"
         )
 
     selected_start = datetime.combine(selected_start_date, datetime.min.time())
@@ -166,6 +168,17 @@ def render_overall_analysis(
     """Render Общий анализ section."""
     st.header("Общий анализ")
 
+    cohort_type = cohorts.COHORT_TYPE_MONTHS if not is_days else cohorts.COHORT_TYPE_DAYS
+    data_loader.update_cohorts_in_db(
+        start_date=selected_start_date,
+        end_date=selected_end_date,
+        cohort_type=cohort_type,
+        cohort_size=cohort_size,
+        num_cohorts=num_cohorts
+    )
+
+    st.cache_data.clear()
+
     sales_df = data_loader.load_sales_from_db(
         datetime.combine(selected_start_date, datetime.min.time()),
         datetime.combine(selected_end_date, datetime.min.time())
@@ -174,7 +187,15 @@ def render_overall_analysis(
     clients_df = data_loader.load_clients_from_db()
     promotion_df = data_loader.load_promotion_costs_from_db()
     marketing_df = data_loader.load_other_marketing_costs_from_db()
+
     cohorts_df = data_loader.load_cohorts_from_db()
+    if not cohorts_df.empty:
+        cohorts_df["date_start"] = pd.to_datetime(cohorts_df["date_start"])
+        cohorts_df["date_end"] = pd.to_datetime(cohorts_df["date_end"])
+        cohorts_df = cohorts_df[
+            (cohorts_df["date_start"] >= selected_start_date) &
+            (cohorts_df["date_end"] <= selected_end_date)
+        ]
 
     metrics_df = analysis.calculate_overall_metrics(sales_df, promotion_df, marketing_df, clients_df)
     st.dataframe(metrics_df, use_container_width=True, hide_index=True)
@@ -278,6 +299,12 @@ def render_overall_analysis(
         st.dataframe(formatted_profit, use_container_width=True)
     else:
         st.warning("Нет данных")
+
+    st.divider()
+
+    fig_profit_trend = plotting.create_profit_trend_chart(profit_table)
+    if fig_profit_trend:
+        st.plotly_chart(fig_profit_trend, use_container_width=True)
 
     st.divider()
 

@@ -88,13 +88,16 @@ def calculate_revenue_table(sales_df: pd.DataFrame, cohorts_df: pd.DataFrame) ->
     """Calculate revenue table by channel and cohort date range."""
     if sales_df.empty or cohorts_df.empty:
         return pd.DataFrame()
-    
+
     if "Date" not in sales_df.columns or "Revenue" not in sales_df.columns:
         return pd.DataFrame()
-    
+
     if "acquisition_channel" not in sales_df.columns:
         return pd.DataFrame()
-    
+
+    if "cohort" in sales_df.columns:
+        sales_df = sales_df[sales_df["cohort"] != ""]
+
     sales_df = sales_df.copy()
     if not pd.api.types.is_datetime64_any_dtype(sales_df["Date"]):
         sales_df["Date"] = pd.to_datetime(sales_df["Date"])
@@ -137,13 +140,16 @@ def calculate_cost_table(sales_df: pd.DataFrame, cohorts_df: pd.DataFrame) -> pd
     """Calculate cost table by channel and cohort date range."""
     if sales_df.empty or cohorts_df.empty:
         return pd.DataFrame()
-    
+
     if "Date" not in sales_df.columns or "cost" not in sales_df.columns:
         return pd.DataFrame()
-    
+
     if "acquisition_channel" not in sales_df.columns:
         return pd.DataFrame()
-    
+
+    if "cohort" in sales_df.columns:
+        sales_df = sales_df[sales_df["cohort"] != ""]
+
     sales_df = sales_df.copy()
     if not pd.api.types.is_datetime64_any_dtype(sales_df["Date"]):
         sales_df["Date"] = pd.to_datetime(sales_df["Date"])
@@ -306,13 +312,16 @@ def calculate_orders_table(sales_df: pd.DataFrame, cohorts_df: pd.DataFrame) -> 
     """Calculate number of orders by channel and cohort date range."""
     if sales_df.empty or cohorts_df.empty:
         return pd.DataFrame()
-    
+
     if "Date" not in sales_df.columns:
         return pd.DataFrame()
-    
+
     if "acquisition_channel" not in sales_df.columns:
         return pd.DataFrame()
-    
+
+    if "cohort" in sales_df.columns:
+        sales_df = sales_df[sales_df["cohort"] != ""]
+
     sales_df = sales_df.copy()
     if not pd.api.types.is_datetime64_any_dtype(sales_df["Date"]):
         sales_df["Date"] = pd.to_datetime(sales_df["Date"])

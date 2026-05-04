@@ -169,6 +169,14 @@ def assign_cohort(df: pd.DataFrame, date_column: str,
 def render_cohort_settings(start_date: datetime, end_date: datetime, current_mode: str = "Cohort Size"):
     """Render cohort settings in sidebar and return values."""
     import streamlit as st
+
+    num_cohorts_new, cohort_dates = recalculate_from_cohort_size(
+        start_date=start_date,
+        end_date=end_date,
+        cohort_type=COHORT_TYPE_MONTHS,
+        cohort_size=st.session_state.cohort_size_input
+    )
+    st.session_state.num_cohorts_input = num_cohorts_new
     
     st.sidebar.header("Cohort Settings")
     cohort_type = st.sidebar.selectbox(
@@ -197,17 +205,14 @@ def render_cohort_settings(start_date: datetime, end_date: datetime, current_mod
         )
 
         if cohort_size_input != st.session_state.cohort_size_input:
+            st.session_state.cohort_size_input = cohort_size_input
             num_cohorts_new, cohort_dates = recalculate_from_cohort_size(
                 start_date=start_date,
                 end_date=end_date,
                 cohort_type=cohort_type,
                 cohort_size=cohort_size_input
             )
-            st.session_state.cohort_size_input = cohort_size_input
             st.session_state.num_cohorts_input = num_cohorts_new
-            st.session_state._needs_rerun = True
-        else:
-            num_cohorts_new = st.session_state.num_cohorts_input
 
         st.sidebar.info(f"📊 Рассчитанное количество когорт: **{num_cohorts_new}**")
     else:
@@ -230,7 +235,13 @@ def render_cohort_settings(start_date: datetime, end_date: datetime, current_mod
             st.session_state.cohort_size_input = cohort_size_new
             st.session_state._needs_rerun = True
         else:
-            cohort_size_new = st.session_state.cohort_size_input
+            cohort_size_new, cohort_dates = recalculate_from_num_cohorts(
+                start_date=start_date,
+                end_date=end_date,
+                cohort_type=cohort_type,
+                num_cohorts=num_cohorts_input
+            )
+            st.session_state.cohort_size_input = cohort_size_new
 
         cohort_size = cohort_size_new
         num_cohorts = num_cohorts_input
@@ -268,4 +279,9 @@ def render_cohort_settings(start_date: datetime, end_date: datetime, current_mod
 
     is_days = cohort_type != "Cohort Size" or st.session_state.get("_cohort_type_days", False)
 
-    return cohort_type, st.session_state.num_cohorts_input, st.session_state.cohort_size_input, cohort_dates, is_days
+    if st.session_state.calculation_mode == "Cohort Size":
+        return_num_cohorts = num_cohorts_new
+    else:
+        return_num_cohorts = num_cohorts_input
+
+    return cohort_type, return_num_cohorts, st.session_state.cohort_size_input, cohort_dates, is_days

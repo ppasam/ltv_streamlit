@@ -576,7 +576,7 @@ def create_cohorts_table() -> None:
     db_url = get_database_url()
     conn = psycopg2.connect(db_url)
     cur = conn.cursor()
-    
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS cohorts (
             cohort VARCHAR PRIMARY KEY,
@@ -584,6 +584,58 @@ def create_cohorts_table() -> None:
             date_end DATE
         )
     """)
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def update_cohorts_in_db(start_date: datetime, end_date: datetime,
+                          cohort_type: str, cohort_size: int,
+                          num_cohorts: int) -> None:
+    """Update cohorts table in PostgreSQL based on parameters."""
+    import cohorts as coh
+
+    if cohort_type == coh.COHORT_TYPE_DAYS:
+        _, cohort_dates = coh.recalculate_from_cohort_size(
+            start_date=start_date,
+            end_date=end_date,
+            cohort_type=cohort_type,
+            cohort_size=cohort_size
+        )
+    else:
+        _, cohort_dates = coh.recalculate_from_num_cohorts(
+            start_date=start_date,
+            end_date=end_date,
+            cohort_type=cohort_type,
+            num_cohorts=num_cohorts
+        )
+
+    cohorts_data = []
+    for i, cs in enumerate(cohort_dates):
+        if i < len(cohort_dates) - 1:
+            ce = cohort_dates[i + 1] - timedelta(days=1)
+        else:
+            ce = end_date
+        if ce > end_date:
+            ce = end_date
+        cohorts_data.append({
+            "cohort": f"Cohort {i + 1}",
+            "date_start": cs.strftime('%Y-%m-%d'),
+            "date_end": ce.strftime('%Y-%m-%d')
+        })
+
+    db_url = get_database_url()
+    conn = psycopg2.connect(db_url)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM cohorts")
+    conn.commit()
+
+    for row in cohorts_data:
+        cur.execute(
+            "INSERT INTO cohorts (cohort, date_start, date_end) VALUES (%s, %s, %s)",
+            (row["cohort"], row["date_start"], row["date_end"])
+        )
+
     conn.commit()
     cur.close()
     conn.close()

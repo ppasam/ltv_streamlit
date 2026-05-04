@@ -156,5 +156,63 @@ def create_avg_profit_bar_chart(avg_profit_df: pd.DataFrame) -> go.Figure:
     
     fig.update_xaxes(tickfont=dict(size=14, color="#1a1a1a"))
     fig.update_yaxes(tickfont=dict(size=14, color="#1a1a1a"))
-    
+
+    return fig
+
+
+def create_profit_trend_chart(profit_df: pd.DataFrame) -> go.Figure:
+    """Create line chart for profit trend by channel and cohort periods."""
+    if profit_df.empty:
+        return None
+
+    profit_df = profit_df.copy()
+
+    channels = list(profit_df.index)
+    if "ИТОГО" in channels:
+        channels.remove("ИТОГО")
+
+    columns = [col for col in profit_df.columns if col != "ВСЕГО"]
+
+    if not channels or not columns:
+        return None
+
+    fig = go.Figure()
+
+    colors = px.colors.qualitative.Set2 + px.colors.qualitative.Dark24
+
+    for i, channel in enumerate(channels):
+        fig.add_trace(go.Scatter(
+            x=columns,
+            y=profit_df.loc[channel].values,
+            mode="lines+markers+text" if len(columns) <= 10 else "lines+markers",
+            name=channel,
+            line=dict(width=3, color=colors[i % len(colors)]),
+            marker=dict(size=10, symbol="circle"),
+            text=[f"{v:,.2f}".replace(",", " ") for v in profit_df.loc[channel].values],
+            textposition="top center",
+            textfont=dict(size=10, color="#1a1a1a")
+        ))
+
+    fig.update_layout(
+        title=dict(text="Динамика прибыли по каналам и периодам", font=dict(size=20, color="#1a1a1a", family="Arial Black")),
+        xaxis_title=dict(text="Период (когорта)", font=dict(size=16, color="#1a1a1a", family="Arial")),
+        yaxis_title=dict(text="Прибыль", font=dict(size=16, color="#1a1a1a", family="Arial")),
+        legend=dict(
+            orientation="v",
+            yanchor="top",
+            y=1,
+            xanchor="left",
+            x=1.02,
+            font=dict(size=14, color="#1a1a1a")
+        ),
+        hovermode="x unified",
+        margin=dict(t=100, b=100, l=80, r=180),
+        plot_bgcolor="rgba(255,255,255,0.9)",
+        paper_bgcolor="white",
+        font=dict(size=14, color="#1a1a1a", family="Arial")
+    )
+
+    fig.update_xaxes(tickfont=dict(size=14, color="#1a1a1a"), tickangle=45)
+    fig.update_yaxes(tickfont=dict(size=14, color="#1a1a1a"))
+
     return fig
