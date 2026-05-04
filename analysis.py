@@ -349,3 +349,46 @@ def calculate_orders_table(sales_df: pd.DataFrame, cohorts_df: pd.DataFrame) -> 
     orders_df = pd.concat([orders_df, totals_row.to_frame().T])
     
     return orders_df
+
+
+def calculate_avg_acquisition_cost_table(promotion_df: pd.DataFrame, orders_df: pd.DataFrame) -> pd.DataFrame:
+    """Calculate average acquisition cost per order = Promotion Costs / Number of Orders."""
+    if promotion_df.empty or orders_df.empty:
+        return pd.DataFrame()
+    
+    all_columns = list(promotion_df.columns)
+    channels = list(promotion_df.index)
+    
+    if "ИТОГО" in channels:
+        channels = channels[:-1]
+    
+    table_data = {}
+    for channel in channels:
+        row_data = {}
+        for col in all_columns:
+            promo_val = promotion_df.loc[channel, col] if col in promotion_df.columns else 0
+            orders_val = orders_df.loc[channel, col] if col in orders_df.columns and channel in orders_df.index else 0
+            
+            if orders_val != 0:
+                row_data[col] = promo_val / orders_val
+            else:
+                row_data[col] = 0
+        
+        table_data[channel] = row_data
+    
+    avg_cost_df = pd.DataFrame(table_data).T
+    
+    totals_row_data = {}
+    for col in all_columns:
+        promo_sum = promotion_df[col].sum() if col in promotion_df.columns else 0
+        orders_sum = orders_df[col].sum() if col in orders_df.columns else 0
+        if orders_sum != 0:
+            totals_row_data[col] = promo_sum / orders_sum
+        else:
+            totals_row_data[col] = 0
+    
+    totals_row = pd.Series(totals_row_data)
+    totals_row.name = "ИТОГО"
+    avg_cost_df = pd.concat([avg_cost_df, totals_row.to_frame().T])
+    
+    return avg_cost_df
