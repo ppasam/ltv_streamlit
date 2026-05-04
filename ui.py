@@ -208,6 +208,16 @@ def render_overall_analysis(
 
     st.divider()
 
+    st.subheader("Средняя прибыль с заказа")
+    avg_profit_by_channel = analysis.calculate_avg_profit_by_channel_table(profit_by_channel_table, orders_by_channel)
+    if not avg_profit_by_channel.empty:
+        formatted_avg_profit = avg_profit_by_channel.style.format({"Сумма": "{:,.2f}"})
+        st.dataframe(formatted_avg_profit, use_container_width=True, hide_index=True)
+    else:
+        st.warning("Нет данных")
+
+    st.divider()
+
     st.subheader("Выручка")
     if not revenue_table.empty:
         formatted_revenue = revenue_table.style.format("{:,.2f}")

@@ -443,6 +443,46 @@ def calculate_orders_by_channel_table(orders_table: pd.DataFrame) -> pd.DataFram
     return pd.DataFrame(table_data)
 
 
+def calculate_avg_profit_by_channel_table(profit_by_channel_df: pd.DataFrame, orders_by_channel_df: pd.DataFrame) -> pd.DataFrame:
+    """Calculate average profit per order by channel."""
+    if profit_by_channel_df.empty or orders_by_channel_df.empty:
+        return pd.DataFrame()
+    
+    profit_by_channel_df = profit_by_channel_df.copy()
+    orders_by_channel_df = orders_by_channel_df.copy()
+    
+    if "Канал" in profit_by_channel_df.columns:
+        profit_by_channel_df = profit_by_channel_df.set_index("Канал")
+    if "Канал" in orders_by_channel_df.columns:
+        orders_by_channel_df = orders_by_channel_df.set_index("Канал")
+    
+    channels = []
+    avg_profits = []
+    
+    for channel in profit_by_channel_df.index:
+        if channel == "ИТОГО":
+            continue
+        profit_val = profit_by_channel_df.loc[channel, "Сумма"] if "Сумма" in profit_by_channel_df.columns else 0
+        orders_val = orders_by_channel_df.loc[channel, "Сумма"] if "Сумма" in orders_by_channel_df.columns else 0
+        
+        if orders_val != 0:
+            avg_profit = profit_val / orders_val
+        else:
+            avg_profit = 0
+        
+        channels.append(channel)
+        avg_profits.append(avg_profit)
+    
+    total_profit = profit_by_channel_df.loc["ИТОГО", "Сумма"] if "ИТОГО" in profit_by_channel_df.index and "Сумма" in profit_by_channel_df.columns else 0
+    total_orders = orders_by_channel_df.loc["ИТОГО", "Сумма"] if "ИТОГО" in orders_by_channel_df.index and "Сумма" in orders_by_channel_df.columns else 0
+    total_avg = total_profit / total_orders if total_orders != 0 else 0
+    
+    channels.append("ИТОГО")
+    avg_profits.append(total_avg)
+    
+    return pd.DataFrame({"Канал": channels, "Сумма": avg_profits})
+
+
 def calculate_avg_acquisition_cost_table(promotion_df: pd.DataFrame, orders_table: pd.DataFrame) -> pd.DataFrame:
     """Calculate average acquisition cost per order as Promotion Costs / Orders."""
     if orders_table.empty:
