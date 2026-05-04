@@ -230,6 +230,12 @@ def render_overall_analysis(
 
     st.divider()
 
+    fig_avg_profit = plotting.create_avg_profit_bar_chart(avg_profit_by_channel)
+    if fig_avg_profit:
+        st.plotly_chart(fig_avg_profit, use_container_width=True)
+
+    st.divider()
+
     st.subheader("Выручка")
     if not revenue_table.empty:
         formatted_revenue = revenue_table.style.format("{:,.2f}")

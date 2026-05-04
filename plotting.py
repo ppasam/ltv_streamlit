@@ -96,3 +96,65 @@ def create_orders_by_channel_pie_chart(orders_by_channel_df: pd.DataFrame) -> go
     )
     
     return fig
+
+
+def create_avg_profit_bar_chart(avg_profit_df: pd.DataFrame) -> go.Figure:
+    """Create bar chart for average profit per order by channel."""
+    if avg_profit_df.empty:
+        return None
+    
+    avg_profit_df = avg_profit_df.copy()
+    
+    has_total = "ИТОГО" in avg_profit_df.index
+    total_value = 0
+    if has_total:
+        total_value = avg_profit_df.loc["ИТОГО", "Сумма"] if "Сумма" in avg_profit_df.columns else 0
+        avg_profit_df = avg_profit_df.drop("ИТОГО")
+    
+    if "Канал" in avg_profit_df.columns:
+        avg_profit_df = avg_profit_df.set_index("Канал")
+    
+    if "Сумма" not in avg_profit_df.columns:
+        return None
+    
+    fig = px.bar(
+        avg_profit_df,
+        y="Сумма",
+        x=avg_profit_df.index,
+        title="Средняя прибыль с заказа",
+        color="Сумма",
+        color_continuous_scale="Blues",
+        text_auto=".2f"
+    )
+    
+    fig.update_traces(
+        textposition="outside",
+        textfont=dict(size=14, color="#1a1a1a")
+    )
+    
+    if has_total and total_value > 0:
+        fig.add_hline(
+            y=total_value,
+            line_dash="dash",
+            line_color="red",
+            line_width=3,
+            annotation_text=f"ИТОГО: {total_value:.2f}",
+            annotation_position="top right",
+            annotation_font=dict(color="red", size=16, family="Arial Black")
+        )
+    
+    fig.update_layout(
+        xaxis_title=dict(text="Канал", font=dict(size=16, color="#1a1a1a", family="Arial")),
+        yaxis_title=dict(text="Средняя прибыль с заказа", font=dict(size=16, color="#1a1a1a", family="Arial")),
+        showlegend=False,
+        title_font=dict(size=20, color="#1a1a1a", family="Arial Black"),
+        margin=dict(t=100, b=80, l=80, r=40),
+        plot_bgcolor="rgba(255,255,255,0.9)",
+        paper_bgcolor="white",
+        font=dict(size=14, color="#1a1a1a", family="Arial")
+    )
+    
+    fig.update_xaxes(tickfont=dict(size=14, color="#1a1a1a"))
+    fig.update_yaxes(tickfont=dict(size=14, color="#1a1a1a"))
+    
+    return fig
