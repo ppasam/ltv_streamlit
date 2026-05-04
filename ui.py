@@ -197,6 +197,17 @@ def render_overall_analysis(
 
     st.divider()
 
+    st.subheader("Количество заказов по каналам привлечения")
+    orders_table = analysis.calculate_orders_table(sales_df, cohorts_df)
+    orders_by_channel = analysis.calculate_orders_by_channel_table(orders_table)
+    if not orders_by_channel.empty:
+        formatted_orders_by_channel = orders_by_channel.style.format({"Сумма": "{:,.0f}"})
+        st.dataframe(formatted_orders_by_channel, use_container_width=True, hide_index=True)
+    else:
+        st.warning("Нет данных")
+
+    st.divider()
+
     st.subheader("Выручка")
     if not revenue_table.empty:
         formatted_revenue = revenue_table.style.format("{:,.2f}")
@@ -243,7 +254,6 @@ def render_overall_analysis(
     st.divider()
 
     st.subheader("Количество заказов")
-    orders_table = analysis.calculate_orders_table(sales_df, cohorts_df)
     if not orders_table.empty:
         formatted_orders = orders_table.style.format("{:,.0f}")
         st.dataframe(formatted_orders, use_container_width=True)

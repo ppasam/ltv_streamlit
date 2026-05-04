@@ -407,6 +407,42 @@ def calculate_profit_by_channel_table(profit_table: pd.DataFrame) -> pd.DataFram
     return pd.DataFrame(table_data)
 
 
+def calculate_orders_by_channel_table(orders_table: pd.DataFrame) -> pd.DataFrame:
+    """Calculate number of orders by channel with sum and share percentage."""
+    if orders_table.empty:
+        return pd.DataFrame()
+    
+    if "ВСЕГО" not in orders_table.columns:
+        return pd.DataFrame()
+    
+    channels = [idx for idx in orders_table.index if idx != "ИТОГО"]
+    
+    orders_values = []
+    for channel in channels:
+        orders_val = orders_table.loc[channel, "ВСЕГО"] if "ВСЕГО" in orders_table.columns else 0
+        orders_values.append(orders_val)
+    
+    total_orders = sum(orders_values)
+    
+    table_data = []
+    for i, channel in enumerate(channels):
+        orders_val = orders_values[i]
+        share = round((orders_val / total_orders) * 100, 2) if total_orders != 0 else 0
+        table_data.append({
+            "Канал": channel,
+            "Сумма": orders_val,
+            "Доля": f"{share}%"
+        })
+    
+    table_data.append({
+        "Канал": "ИТОГО",
+        "Сумма": total_orders,
+        "Доля": "100%"
+    })
+    
+    return pd.DataFrame(table_data)
+
+
 def calculate_avg_acquisition_cost_table(promotion_df: pd.DataFrame, orders_table: pd.DataFrame) -> pd.DataFrame:
     """Calculate average acquisition cost per order as Promotion Costs / Orders."""
     if orders_table.empty:
