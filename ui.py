@@ -229,6 +229,16 @@ def render_overall_analysis(
     else:
         st.warning("Нет данных")
 
+    st.divider()
+
+    st.subheader("Количество заказов")
+    orders_table = analysis.calculate_orders_table(sales_df, cohorts_df)
+    if not orders_table.empty:
+        formatted_orders = orders_table.style.format("{:,.0f}")
+        st.dataframe(formatted_orders, use_container_width=True)
+    else:
+        st.warning("Нет данных")
+
 
 def render_rfm_analysis() -> None:
     """Render RFM анализ section."""

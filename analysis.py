@@ -300,3 +300,52 @@ def calculate_profit_table(revenue_df: pd.DataFrame, cost_df: pd.DataFrame,
     profit_df = pd.concat([profit_df, totals_row.to_frame().T])
     
     return profit_df
+
+
+def calculate_orders_table(sales_df: pd.DataFrame, cohorts_df: pd.DataFrame) -> pd.DataFrame:
+    """Calculate number of orders by channel and cohort date range."""
+    if sales_df.empty or cohorts_df.empty:
+        return pd.DataFrame()
+    
+    if "Date" not in sales_df.columns:
+        return pd.DataFrame()
+    
+    if "acquisition_channel" not in sales_df.columns:
+        return pd.DataFrame()
+    
+    sales_df = sales_df.copy()
+    if not pd.api.types.is_datetime64_any_dtype(sales_df["Date"]):
+        sales_df["Date"] = pd.to_datetime(sales_df["Date"])
+    
+    cohorts_sorted = cohorts_df.sort_values("date_start")
+    cohorts_sorted = cohorts_sorted.copy()
+    cohorts_sorted["date_start"] = pd.to_datetime(cohorts_sorted["date_start"])
+    cohorts_sorted["date_end"] = pd.to_datetime(cohorts_sorted["date_end"])
+    
+    channels = sorted(sales_df["acquisition_channel"].dropna().unique())
+    
+    table_data = {}
+    for channel in channels:
+        channel_sales = sales_df[sales_df["acquisition_channel"] == channel]
+        row_data = {}
+        for _, coh_row in cohorts_sorted.iterrows():
+            date_start = coh_row["date_start"]
+            date_end = coh_row["date_end"]
+            col_header = date_end.strftime('%Y-%m-%d') if hasattr(date_end, 'strftime') else str(date_end)
+            
+            cohort_sales = channel_sales[(channel_sales["Date"] >= date_start) & (channel_sales["Date"] <= date_end)]
+            row_data[col_header] = cohort_sales.shape[0]
+        
+        row_data["ВСЕГО"] = sum(row_data.values())
+        table_data[channel] = row_data
+    
+    if not table_data:
+        return pd.DataFrame()
+    
+    orders_df = pd.DataFrame(table_data).T
+    
+    totals_row = orders_df.sum()
+    totals_row.name = "ИТОГО"
+    orders_df = pd.concat([orders_df, totals_row.to_frame().T])
+    
+    return orders_df
