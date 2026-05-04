@@ -179,10 +179,25 @@ def render_overall_analysis(
     metrics_df = analysis.calculate_overall_metrics(sales_df, promotion_df, marketing_df, clients_df)
     st.dataframe(metrics_df, use_container_width=True, hide_index=True)
 
+    revenue_table = analysis.calculate_revenue_table(sales_df, cohorts_df)
+    cost_table = analysis.calculate_cost_table(sales_df, cohorts_df)
+    promotion_costs_table = analysis.calculate_promotion_costs_table(promotion_df, cohorts_df)
+    other_costs_table = analysis.calculate_other_marketing_costs_table(marketing_df, cohorts_df)
+    profit_table = analysis.calculate_profit_table(revenue_table, cost_table, promotion_costs_table, other_costs_table)
+
+    st.divider()
+
+    st.subheader("Прибыль по каналам привлечения")
+    profit_by_channel_table = analysis.calculate_profit_by_channel_table(profit_table)
+    if not profit_by_channel_table.empty:
+        formatted_channel = profit_by_channel_table.style.format({"Сумма": "{:,.2f}"})
+        st.dataframe(formatted_channel, use_container_width=True, hide_index=True)
+    else:
+        st.warning("Нет данных")
+
     st.divider()
 
     st.subheader("Выручка")
-    revenue_table = analysis.calculate_revenue_table(sales_df, cohorts_df)
     if not revenue_table.empty:
         formatted_revenue = revenue_table.style.format("{:,.2f}")
         st.dataframe(formatted_revenue, use_container_width=True)
@@ -192,7 +207,6 @@ def render_overall_analysis(
     st.divider()
 
     st.subheader("Себестоимость продаж")
-    cost_table = analysis.calculate_cost_table(sales_df, cohorts_df)
     if not cost_table.empty:
         formatted_cost = cost_table.style.format("{:,.2f}")
         st.dataframe(formatted_cost, use_container_width=True)
@@ -202,7 +216,6 @@ def render_overall_analysis(
     st.divider()
 
     st.subheader("Расходы на привлечение и удержание")
-    promotion_costs_table = analysis.calculate_promotion_costs_table(promotion_df, cohorts_df)
     if not promotion_costs_table.empty:
         formatted_promotion = promotion_costs_table.style.format("{:,.2f}")
         st.dataframe(formatted_promotion, use_container_width=True)
@@ -212,7 +225,6 @@ def render_overall_analysis(
     st.divider()
 
     st.subheader("Прочие затраты")
-    other_costs_table = analysis.calculate_other_marketing_costs_table(marketing_df, cohorts_df)
     if not other_costs_table.empty:
         formatted_other = other_costs_table.style.format("{:,.2f}")
         st.dataframe(formatted_other, use_container_width=True)
@@ -222,7 +234,6 @@ def render_overall_analysis(
     st.divider()
 
     st.subheader("Прибыль")
-    profit_table = analysis.calculate_profit_table(revenue_table, cost_table, promotion_costs_table, other_costs_table)
     if not profit_table.empty:
         formatted_profit = profit_table.style.format("{:,.2f}")
         st.dataframe(formatted_profit, use_container_width=True)
