@@ -1,5 +1,5 @@
 """Analysis module for LTV data analysis."""
-from datetime import datetime, date
+from datetime import datetime
 from typing import Optional
 
 import pandas as pd
@@ -84,106 +84,39 @@ def calculate_overall_metrics(
     return pd.DataFrame(metrics_data)
 
 
-def calculate_promotion_costs_table(promotion_df: pd.DataFrame, cohorts_df: pd.DataFrame) -> pd.DataFrame:
-    """Calculate promotion costs table by channel and cohort date ranges."""
-    if promotion_df.empty or cohorts_df.empty:
+def calculate_revenue_table(sales_df: pd.DataFrame, cohorts_df: pd.DataFrame) -> pd.DataFrame:
+    """Calculate revenue table by channel and cohort date range."""
+    if sales_df.empty or cohorts_df.empty:
         return pd.DataFrame()
     
-    if "expenses_date" not in promotion_df.columns or "channels" not in promotion_df.columns or "costs" not in promotion_df.columns:
+    if "Date" not in sales_df.columns or "Revenue" not in sales_df.columns:
         return pd.DataFrame()
+    
+    if "acquisition_channel" not in sales_df.columns:
+        return pd.DataFrame()
+    
+    sales_df = sales_df.copy()
+    if not pd.api.types.is_datetime64_any_dtype(sales_df["Date"]):
+        sales_df["Date"] = pd.to_datetime(sales_df["Date"])
     
     cohorts_sorted = cohorts_df.sort_values("date_start")
-    channels = sorted(promotion_df["channels"].dropna().unique())
+    cohorts_sorted = cohorts_sorted.copy()
+    cohorts_sorted["date_start"] = pd.to_datetime(cohorts_sorted["date_start"])
+    cohorts_sorted["date_end"] = pd.to_datetime(cohorts_sorted["date_end"])
+    
+    channels = sorted(sales_df["acquisition_channel"].dropna().unique())
     
     table_data = {}
     for channel in channels:
-        channel_costs = promotion_df[promotion_df["channels"] == channel]
+        channel_sales = sales_df[sales_df["acquisition_channel"] == channel]
         row_data = {}
-        
         for _, coh_row in cohorts_sorted.iterrows():
             date_start = coh_row["date_start"]
             date_end = coh_row["date_end"]
             col_header = date_end.strftime('%Y-%m-%d') if hasattr(date_end, 'strftime') else str(date_end)
             
-            if isinstance(date_start, str):
-                date_start = datetime.strptime(date_start.split(' ')[0], '%Y-%m-%d').date()
-            else:
-                date_start = date_start.date() if hasattr(date_start, 'date') else date_start
-            
-            if isinstance(date_end, str):
-                date_end = datetime.strptime(date_end.split(' ')[0], '%Y-%m-%d').date()
-            else:
-                date_end = date_end.date() if hasattr(date_end, 'date') else date_end
-            
-            filtered = channel_costs[
-                channel_costs["expenses_date"].apply(
-                    lambda x: (
-                        (d := datetime.strptime(str(x).split(' ')[0], '%Y-%m-%d').date()) 
-                        if isinstance(x, str) else 
-                        (x.date() if hasattr(x, 'date') else x)
-                    ) >= date_start and 
-                    (d if isinstance(d, date) else d) <= date_end
-                    if x else False
-                ) if channel_costs["expenses_date"].notna().any() else False
-            ]
-            
-            total = 0
-            for _, row in channel_costs.iterrows():
-                exp_date = row["expenses_date"]
-                if not exp_date:
-                    continue
-                try:
-                    if isinstance(exp_date, str):
-                        exp_date_dt = datetime.strptime(exp_date.split(' ')[0], '%Y-%m-%d').date()
-                    else:
-                        exp_date_dt = exp_date.date() if hasattr(exp_date, 'date') else exp_date
-                    
-                    if date_start <= exp_date_dt <= date_end:
-                        total += row["costs"] if row["costs"] else 0
-                except:
-                    continue
-            
-            row_data[col_header] = total
-        
-        row_data["ВСЕГО"] = sum(row_data.values())
-        table_data[channel] = row_data
-    
-    if not table_data:
-        return pd.DataFrame()
-    
-    costs_df = pd.DataFrame(table_data).T
-    
-    totals_row = costs_df.sum()
-    totals_row.name = "ИТОГО"
-    costs_df = pd.concat([costs_df, totals_row.to_frame().T])
-    
-    return costs_df
-
-
-def calculate_revenue_table(sales_df: pd.DataFrame, cohorts_df: pd.DataFrame) -> pd.DataFrame:
-    """Calculate revenue table by channel and cohort."""
-    if sales_df.empty or "cohort" not in sales_df.columns:
-        return pd.DataFrame()
-    
-    sales_with_cohort = sales_df[sales_df["cohort"] != ""]
-    
-    if sales_with_cohort.empty:
-        return pd.DataFrame()
-    
-    cohorts_sorted = cohorts_df.sort_values("date_start")
-    channels = sorted(sales_with_cohort["acquisition_channel"].dropna().unique())
-    
-    table_data = {}
-    for channel in channels:
-        channel_sales = sales_with_cohort[sales_with_cohort["acquisition_channel"] == channel]
-        row_data = {}
-        for _, coh_row in cohorts_sorted.iterrows():
-            cohort_name = coh_row["cohort"]
-            date_end = coh_row["date_end"]
-            col_header = date_end.strftime('%Y-%m-%d') if hasattr(date_end, 'strftime') else str(date_end)
-            
-            cohort_sales = channel_sales[channel_sales["cohort"] == cohort_name]
-            row_data[col_header] = cohort_sales["Revenue"].sum() if "Revenue" in cohort_sales.columns else 0
+            cohort_sales = channel_sales[(channel_sales["Date"] >= date_start) & (channel_sales["Date"] <= date_end)]
+            row_data[col_header] = cohort_sales["Revenue"].sum()
         
         row_data["ВСЕГО"] = sum(row_data.values())
         table_data[channel] = row_data
@@ -198,3 +131,138 @@ def calculate_revenue_table(sales_df: pd.DataFrame, cohorts_df: pd.DataFrame) ->
     revenue_df = pd.concat([revenue_df, totals_row.to_frame().T])
     
     return revenue_df
+
+
+def calculate_cost_table(sales_df: pd.DataFrame, cohorts_df: pd.DataFrame) -> pd.DataFrame:
+    """Calculate cost table by channel and cohort date range."""
+    if sales_df.empty or cohorts_df.empty:
+        return pd.DataFrame()
+    
+    if "Date" not in sales_df.columns or "cost" not in sales_df.columns:
+        return pd.DataFrame()
+    
+    if "acquisition_channel" not in sales_df.columns:
+        return pd.DataFrame()
+    
+    sales_df = sales_df.copy()
+    if not pd.api.types.is_datetime64_any_dtype(sales_df["Date"]):
+        sales_df["Date"] = pd.to_datetime(sales_df["Date"])
+    
+    cohorts_sorted = cohorts_df.sort_values("date_start")
+    cohorts_sorted = cohorts_sorted.copy()
+    cohorts_sorted["date_start"] = pd.to_datetime(cohorts_sorted["date_start"])
+    cohorts_sorted["date_end"] = pd.to_datetime(cohorts_sorted["date_end"])
+    
+    channels = sorted(sales_df["acquisition_channel"].dropna().unique())
+    
+    table_data = {}
+    for channel in channels:
+        channel_sales = sales_df[sales_df["acquisition_channel"] == channel]
+        row_data = {}
+        for _, coh_row in cohorts_sorted.iterrows():
+            date_start = coh_row["date_start"]
+            date_end = coh_row["date_end"]
+            col_header = date_end.strftime('%Y-%m-%d') if hasattr(date_end, 'strftime') else str(date_end)
+            
+            cohort_sales = channel_sales[(channel_sales["Date"] >= date_start) & (channel_sales["Date"] <= date_end)]
+            row_data[col_header] = cohort_sales["cost"].sum()
+        
+        row_data["ВСЕГО"] = sum(row_data.values())
+        table_data[channel] = row_data
+    
+    if not table_data:
+        return pd.DataFrame()
+    
+    cost_df = pd.DataFrame(table_data).T
+    
+    totals_row = cost_df.sum()
+    totals_row.name = "ИТОГО"
+    cost_df = pd.concat([cost_df, totals_row.to_frame().T])
+    
+    return cost_df
+
+
+def calculate_promotion_costs_table(promotion_df: pd.DataFrame, cohorts_df: pd.DataFrame) -> pd.DataFrame:
+    """Calculate promotion costs table by channel and cohort."""
+    if promotion_df.empty or "cohort" not in promotion_df.columns:
+        return pd.DataFrame()
+    
+    promotion_with_cohort = promotion_df[promotion_df["cohort"] != ""]
+    
+    if promotion_with_cohort.empty:
+        return pd.DataFrame()
+    
+    if "costs" not in promotion_with_cohort.columns:
+        return pd.DataFrame()
+    
+    cohorts_sorted = cohorts_df.sort_values("date_start")
+    channels = sorted(promotion_with_cohort["channels"].dropna().unique())
+    
+    table_data = {}
+    for channel in channels:
+        channel_costs = promotion_with_cohort[promotion_with_cohort["channels"] == channel]
+        row_data = {}
+        for _, coh_row in cohorts_sorted.iterrows():
+            cohort_name = coh_row["cohort"]
+            date_end = coh_row["date_end"]
+            col_header = date_end.strftime('%Y-%m-%d') if hasattr(date_end, 'strftime') else str(date_end)
+            
+            cohort_costs = channel_costs[channel_costs["cohort"] == cohort_name]
+            row_data[col_header] = cohort_costs["costs"].sum()
+        
+        row_data["ВСЕГО"] = sum(row_data.values())
+        table_data[channel] = row_data
+    
+    if not table_data:
+        return pd.DataFrame()
+    
+    promotion_df_result = pd.DataFrame(table_data).T
+    
+    totals_row = promotion_df_result.sum()
+    totals_row.name = "ИТОГО"
+    promotion_df_result = pd.concat([promotion_df_result, totals_row.to_frame().T])
+    
+    return promotion_df_result
+
+
+def calculate_other_marketing_costs_table(marketing_df: pd.DataFrame, cohorts_df: pd.DataFrame) -> pd.DataFrame:
+    """Calculate other marketing costs table by channel and cohort."""
+    if marketing_df.empty or "cohort" not in marketing_df.columns:
+        return pd.DataFrame()
+    
+    marketing_with_cohort = marketing_df[marketing_df["cohort"] != ""]
+    
+    if marketing_with_cohort.empty:
+        return pd.DataFrame()
+    
+    if "costs" not in marketing_with_cohort.columns:
+        return pd.DataFrame()
+    
+    cohorts_sorted = cohorts_df.sort_values("date_start")
+    channels = sorted(marketing_with_cohort["channels"].dropna().unique())
+    
+    table_data = {}
+    for channel in channels:
+        channel_costs = marketing_with_cohort[marketing_with_cohort["channels"] == channel]
+        row_data = {}
+        for _, coh_row in cohorts_sorted.iterrows():
+            cohort_name = coh_row["cohort"]
+            date_end = coh_row["date_end"]
+            col_header = date_end.strftime('%Y-%m-%d') if hasattr(date_end, 'strftime') else str(date_end)
+            
+            cohort_costs = channel_costs[channel_costs["cohort"] == cohort_name]
+            row_data[col_header] = cohort_costs["costs"].sum()
+        
+        row_data["ВСЕГО"] = sum(row_data.values())
+        table_data[channel] = row_data
+    
+    if not table_data:
+        return pd.DataFrame()
+    
+    marketing_df_result = pd.DataFrame(table_data).T
+    
+    totals_row = marketing_df_result.sum()
+    totals_row.name = "ИТОГО"
+    marketing_df_result = pd.concat([marketing_df_result, totals_row.to_frame().T])
+    
+    return marketing_df_result

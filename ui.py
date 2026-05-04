@@ -174,6 +174,7 @@ def render_overall_analysis(
     clients_df = data_loader.load_clients_from_db()
     promotion_df = data_loader.load_promotion_costs_from_db()
     marketing_df = data_loader.load_other_marketing_costs_from_db()
+    cohorts_df = data_loader.load_cohorts_from_db()
 
     metrics_df = analysis.calculate_overall_metrics(sales_df, promotion_df, marketing_df, clients_df)
     st.dataframe(metrics_df, use_container_width=True, hide_index=True)
@@ -181,7 +182,6 @@ def render_overall_analysis(
     st.divider()
 
     st.subheader("Выручка")
-    cohorts_df = data_loader.load_cohorts_from_db()
     revenue_table = analysis.calculate_revenue_table(sales_df, cohorts_df)
     if not revenue_table.empty:
         formatted_revenue = revenue_table.style.format("{:,.2f}")
@@ -191,11 +191,31 @@ def render_overall_analysis(
 
     st.divider()
 
+    st.subheader("Себестоимость продаж")
+    cost_table = analysis.calculate_cost_table(sales_df, cohorts_df)
+    if not cost_table.empty:
+        formatted_cost = cost_table.style.format("{:,.2f}")
+        st.dataframe(formatted_cost, use_container_width=True)
+    else:
+        st.warning("Нет данных")
+
+    st.divider()
+
     st.subheader("Расходы на привлечение и удержание")
     promotion_costs_table = analysis.calculate_promotion_costs_table(promotion_df, cohorts_df)
     if not promotion_costs_table.empty:
-        formatted_costs = promotion_costs_table.style.format("{:,.2f}")
-        st.dataframe(formatted_costs, use_container_width=True)
+        formatted_promotion = promotion_costs_table.style.format("{:,.2f}")
+        st.dataframe(formatted_promotion, use_container_width=True)
+    else:
+        st.warning("Нет данных")
+
+    st.divider()
+
+    st.subheader("Прочие затраты")
+    other_costs_table = analysis.calculate_other_marketing_costs_table(marketing_df, cohorts_df)
+    if not other_costs_table.empty:
+        formatted_other = other_costs_table.style.format("{:,.2f}")
+        st.dataframe(formatted_other, use_container_width=True)
     else:
         st.warning("Нет данных")
 
