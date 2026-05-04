@@ -277,7 +277,7 @@ def render_cohort_settings(start_date: datetime, end_date: datetime, current_mod
             disabled=True
         )
 
-    is_days = cohort_type != "Cohort Size" or st.session_state.get("_cohort_type_days", False)
+    is_days = cohort_type == COHORT_TYPE_DAYS
 
     if st.session_state.calculation_mode == "Cohort Size":
         return_num_cohorts = num_cohorts_new

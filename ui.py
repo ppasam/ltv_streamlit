@@ -169,12 +169,14 @@ def render_overall_analysis(
     st.header("Общий анализ")
 
     cohort_type = cohorts.COHORT_TYPE_MONTHS if not is_days else cohorts.COHORT_TYPE_DAYS
+    calculation_mode = st.session_state.get("calculation_mode", "Cohort Size")
     data_loader.update_cohorts_in_db(
         start_date=selected_start_date,
         end_date=selected_end_date,
         cohort_type=cohort_type,
         cohort_size=cohort_size,
-        num_cohorts=num_cohorts
+        num_cohorts=num_cohorts,
+        calculation_mode=calculation_mode
     )
 
     st.cache_data.clear()

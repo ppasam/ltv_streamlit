@@ -145,7 +145,6 @@ def load_sales_from_db(start_date: Optional[datetime] = None,
         create_cohorts_table()
         load_sales_data_to_db(source="templates_data")
         populate_clients_from_sales()
-        populate_cohorts_table()
 
     query = "SELECT purchase_date, order_id, order_price, cost, client_id, acquisition_channel, cohort FROM sales"
     if start_date and end_date:
@@ -567,7 +566,6 @@ def populate_clients_from_sales() -> None:
     
     save_clients_data(client_data)
     add_cohort_to_sales()
-    populate_cohorts_table()
     add_cohort_to_expenses_tables()
 
 
@@ -591,11 +589,13 @@ def create_cohorts_table() -> None:
 
 def update_cohorts_in_db(start_date: datetime, end_date: datetime,
                           cohort_type: str, cohort_size: int,
-                          num_cohorts: int) -> None:
+                          num_cohorts: int, calculation_mode: str = "Cohort Size") -> None:
     """Update cohorts table in PostgreSQL based on parameters."""
     import cohorts as coh
 
-    if cohort_type == coh.COHORT_TYPE_DAYS:
+    
+
+    if calculation_mode == "Cohort Size":
         _, cohort_dates = coh.recalculate_from_cohort_size(
             start_date=start_date,
             end_date=end_date,
@@ -626,9 +626,9 @@ def update_cohorts_in_db(start_date: datetime, end_date: datetime,
 
     db_url = get_database_url()
     conn = psycopg2.connect(db_url)
+    conn.autocommit = True
     cur = conn.cursor()
     cur.execute("DELETE FROM cohorts")
-    conn.commit()
 
     for row in cohorts_data:
         cur.execute(
@@ -636,7 +636,6 @@ def update_cohorts_in_db(start_date: datetime, end_date: datetime,
             (row["cohort"], row["date_start"], row["date_end"])
         )
 
-    conn.commit()
     cur.close()
     conn.close()
 
@@ -674,33 +673,35 @@ def populate_cohorts_table() -> None:
     
     db_url = get_database_url()
     conn = psycopg2.connect(db_url)
+    conn.autocommit = True
     cur = conn.cursor()
     cur.execute("DELETE FROM cohorts")
-    conn.commit()
-    
+
     for row in cohorts_data:
         cur.execute(
             "INSERT INTO cohorts (cohort, date_start, date_end) VALUES (%s, %s, %s)",
             (row["cohort"], row["date_start"], row["date_end"])
         )
-    
-    conn.commit()
+
     cur.close()
     conn.close()
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
 def load_cohorts_from_db() -> pd.DataFrame:
     """Load cohorts data from PostgreSQL."""
     db_url = get_database_url()
     conn = psycopg2.connect(db_url)
+    conn.autocommit = True
     cur = conn.cursor()
     cur.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'cohorts')")
     table_exists = cur.fetchone()[0]
-    conn.close()
-    
+
     if not table_exists:
+        conn.close()
         return pd.DataFrame()
-    
-    df = pd.read_sql("SELECT * FROM cohorts ORDER BY date_start", db_url)
+
+    cur.close()
+
+    df = pd.read_sql("SELECT * FROM cohorts ORDER BY date_start", conn)
+    conn.close()
     return df
