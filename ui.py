@@ -365,6 +365,8 @@ def render_rfm_analysis() -> None:
     vals = st.session_state.rfm_values
     key = st.session_state.rfm_key
 
+    st.subheader("Задаем количество покупок для сегментов F - Frequency")
+
     c1, c2, c3 = st.columns(3)
     with c1:
         f2 = st.number_input("для сегмента 2", min_value=2, max_value=max_f2, value=min(vals[0], max_f2), key=f"f2_{key}")
@@ -391,10 +393,14 @@ def render_rfm_analysis() -> None:
         st.session_state.rfm_key = key + 1
         st.rerun()
 
-    st.subheader("Рассчитанные значения:")
-    st.write(f"сегмент 2: {st.session_state.rfm_values[0]}")
-    st.write(f"сегмент 3: {st.session_state.rfm_values[1]}")
-    st.write(f"сегмента 4: {st.session_state.rfm_values[2]}")
+    frequency_data = [
+        {"min n": 1, "max n": f2_n - 1, "№ сегмента F": 4},
+        {"min n": f2_n, "max n": f3_n - 1, "№ сегмента F": 3},
+        {"min n": f3_n, "max n": f4_n - 1, "№ сегмента F": 2},
+        {"min n": f4_n, "max n": max_orders, "№ сегмента F": 1},
+    ]
+    st.subheader("Кол-во клиентов, сделавших n покупок (Frequency)")
+    st.dataframe(frequency_data, use_container_width=True, hide_index=True)
 
 
 def render_cohort_analysis() -> None:
