@@ -202,6 +202,9 @@ def render_overall_analysis(
     metrics_df = analysis.calculate_overall_metrics(sales_df, promotion_df, marketing_df, clients_df)
     st.dataframe(metrics_df, use_container_width=True, hide_index=True)
 
+    max_orders = int(clients_df["num_orders"].max()) if clients_df is not None and not clients_df.empty else int(sales_df.groupby("Customer ID").size().max()) if "Customer ID" in sales_df.columns and not sales_df.empty else 0
+    st.session_state.max_orders_per_customer = max_orders
+
     revenue_table = analysis.calculate_revenue_table(sales_df, cohorts_df)
     cost_table = analysis.calculate_cost_table(sales_df, cohorts_df)
     promotion_costs_table = analysis.calculate_promotion_costs_table(promotion_df, cohorts_df)
@@ -347,16 +350,28 @@ def render_rfm_analysis() -> None:
     if "rfm_key" not in st.session_state:
         st.session_state.rfm_key = 0
 
+    max_orders = st.session_state.get("max_orders_per_customer", 37)
+    if max_orders < 2:
+        max_orders = 37
+    
+    max_f2 = max_orders - 2
+    max_f3 = max_orders - 1
+    max_f4 = max_orders
+    if max_f2 < 2:
+        max_f2 = 2
+        max_f3 = 3
+        max_f4 = 4
+
     vals = st.session_state.rfm_values
     key = st.session_state.rfm_key
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        f2 = st.number_input("для сегмента 2", min_value=2, value=vals[0], key=f"f2_{key}")
+        f2 = st.number_input("для сегмента 2", min_value=2, max_value=max_f2, value=min(vals[0], max_f2), key=f"f2_{key}")
     with c2:
-        f3 = st.number_input("для сегмента 3", min_value=2, value=vals[1], key=f"f3_{key}")
+        f3 = st.number_input("для сегмента 3", min_value=2, max_value=max_f3, value=min(vals[1], max_f3), key=f"f3_{key}")
     with c3:
-        f4 = st.number_input("для сегмента 4", min_value=2, value=vals[2], key=f"f4_{key}")
+        f4 = st.number_input("для сегмента 4", min_value=2, max_value=max_f4, value=min(vals[2], max_f4), key=f"f4_{key}")
 
     f2_n, f3_n, f4_n = f2, f3, f4
 
@@ -364,8 +379,12 @@ def render_rfm_analysis() -> None:
         f3_n = f2_n + 1
     if f3_n >= f4_n:
         f4_n = f3_n + 1
-    if f4_n > 37:
-        f4_n = 37
+    if f4_n > max_f4:
+        f4_n = max_f4
+    if f3_n > max_f3:
+        f3_n = max_f3
+    if f2_n > max_f2:
+        f2_n = max_f2
 
     if f2_n != vals[0] or f3_n != vals[1] or f4_n != vals[2]:
         st.session_state.rfm_values = [f2_n, f3_n, f4_n]
