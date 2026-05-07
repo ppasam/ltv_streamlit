@@ -341,7 +341,41 @@ def render_overall_analysis(
 def render_rfm_analysis() -> None:
     """Render RFM анализ section."""
     st.header("RFM анализ")
-    st.info("🚧 В разработке")
+
+    if "rfm_values" not in st.session_state:
+        st.session_state.rfm_values = [2, 3, 5]
+    if "rfm_key" not in st.session_state:
+        st.session_state.rfm_key = 0
+
+    vals = st.session_state.rfm_values
+    key = st.session_state.rfm_key
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        f2 = st.number_input("для сегмента 2", min_value=2, value=vals[0], key=f"f2_{key}")
+    with c2:
+        f3 = st.number_input("для сегмента 3", min_value=2, value=vals[1], key=f"f3_{key}")
+    with c3:
+        f4 = st.number_input("для сегмента 4", min_value=2, value=vals[2], key=f"f4_{key}")
+
+    f2_n, f3_n, f4_n = f2, f3, f4
+
+    if f2_n >= f3_n:
+        f3_n = f2_n + 1
+    if f3_n >= f4_n:
+        f4_n = f3_n + 1
+    if f4_n > 37:
+        f4_n = 37
+
+    if f2_n != vals[0] or f3_n != vals[1] or f4_n != vals[2]:
+        st.session_state.rfm_values = [f2_n, f3_n, f4_n]
+        st.session_state.rfm_key = key + 1
+        st.rerun()
+
+    st.subheader("Рассчитанные значения:")
+    st.write(f"сегмент 2: {st.session_state.rfm_values[0]}")
+    st.write(f"сегмент 3: {st.session_state.rfm_values[1]}")
+    st.write(f"сегмента 4: {st.session_state.rfm_values[2]}")
 
 
 def render_cohort_analysis() -> None:
