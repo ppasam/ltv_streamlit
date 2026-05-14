@@ -1,6 +1,7 @@
 """UI module for LTV Streamlit application."""
 import io
 from datetime import datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
 import pandas as pd
@@ -205,6 +206,14 @@ def render_overall_analysis(
     max_orders = int(clients_df["num_orders"].max()) if clients_df is not None and not clients_df.empty else int(sales_df.groupby("Customer ID").size().max()) if "Customer ID" in sales_df.columns and not sales_df.empty else 0
     st.session_state.max_orders_per_customer = max_orders
 
+    if clients_df is not None and not clients_df.empty and "total_amount" in clients_df.columns:
+        max_monetary = Decimal(str(round(float(clients_df["total_amount"].max()), 2)))
+    elif "Customer ID" in sales_df.columns and "Revenue" in sales_df.columns and not sales_df.empty:
+        max_monetary = Decimal(str(round(float(sales_df.groupby("Customer ID")["Revenue"].sum().max()), 2)))
+    else:
+        max_monetary = Decimal("0.02")
+    st.session_state.max_monetary_per_customer = max_monetary
+
     revenue_table = analysis.calculate_revenue_table(sales_df, cohorts_df)
     cost_table = analysis.calculate_cost_table(sales_df, cohorts_df)
     promotion_costs_table = analysis.calculate_promotion_costs_table(promotion_df, cohorts_df)
@@ -341,6 +350,82 @@ def render_overall_analysis(
         st.warning("Нет данных")
 
 
+def create_financial_counter(
+    label: str,
+    key: str,
+    min_value: Decimal,
+    max_value: Decimal,
+    step: Decimal,
+    default_value: Decimal
+) -> Decimal:
+    """
+    Компонент-счетчик финансовых данных для Streamlit.
+    
+    Параметры:
+        label: Название счетчика
+        key: Уникальный ключ для session_state
+        min_value: Минимальное значение (включительно)
+        max_value: Максимальное значение (включительно)
+        step: Шаг изменения значения
+        default_value: Значение по умолчанию
+    
+    Возвращает:
+        Текущее значение типа Decimal
+    """
+    # Константы для валидации
+    MIN_VALUE = min_value
+    MAX_VALUE = max_value
+    STEP = step
+    
+    # Инициализация в session_state
+    session_key = f"counter_{key}"
+    if session_key not in st.session_state:
+        # Проверяем, что default_value в пределах диапазона
+        if default_value < MIN_VALUE:
+            st.session_state[session_key] = MIN_VALUE
+        elif default_value > MAX_VALUE:
+            st.session_state[session_key] = MAX_VALUE
+        else:
+            st.session_state[session_key] = default_value
+    
+    # Получаем текущее значение из session_state
+    current_value = Decimal(str(st.session_state[session_key]))
+    
+    # Форматируем значение для отображения (X.XX)
+    display_value = current_value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    
+    # Вычисляем следующие значения для определения активности кнопок
+    next_minus = (current_value - STEP).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    next_plus = (current_value + STEP).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    
+    # Кнопка "минус" неактивна если следующее значение меньше минимума
+    minus_disabled = next_minus < MIN_VALUE
+    
+    # Кнопка "плюс" неактивна если следующее значение больше максимума
+    plus_disabled = next_plus > MAX_VALUE
+    
+    # UI: три колонки [минус] [значение] [плюс]
+    col_minus, col_value, col_plus = st.columns([1, 2, 1])
+    
+    with col_minus:
+        if st.button("−", key=f"{key}_minus", help="Уменьшить", disabled=minus_disabled):
+            new_value = (current_value - STEP).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            st.session_state[session_key] = new_value
+            st.rerun()
+    
+    with col_value:
+        st.write(f"{label}")
+        st.write(f"**{display_value}**")
+    
+    with col_plus:
+        if st.button("+", key=f"{key}_plus", help="Увеличить", disabled=plus_disabled):
+            new_value = (current_value + STEP).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            st.session_state[session_key] = new_value
+            st.rerun()
+    
+    return current_value
+
+
 def render_rfm_analysis() -> None:
     """Render RFM анализ section."""
     st.header("RFM анализ")
@@ -401,6 +486,65 @@ def render_rfm_analysis() -> None:
     ]
     st.subheader("Кол-во клиентов, сделавших n покупок (Frequency)")
     st.dataframe(frequency_data, use_container_width=True, hide_index=True)
+
+    st.subheader("Кол-во клиентов, сделавших покупок на сумму \"с - по\" (Monetary)")
+
+    # Параметры счетчиков (только Decimal)
+    COUNTER_MIN = Decimal("0.02")
+    COUNTER_MAX = Decimal("10.00")
+    COUNTER_STEP = Decimal("0.01")
+
+    # Инициализация session_state если отсутствует
+    if "monetary_values" not in st.session_state:
+        st.session_state.monetary_values = [COUNTER_MIN, COUNTER_MIN + COUNTER_STEP, COUNTER_MIN + COUNTER_STEP * 2]
+
+    vals_m = st.session_state.monetary_values
+
+    # Конвертируем Decimal в float для number_input (только для отображения)
+    min_float = float(Decimal("0.019"))  # 0.019 чтобы 0.03-0.01 > min_value и кнопка была активна
+    max_float = float(COUNTER_MAX)  # 10.00
+    step_float = float(COUNTER_STEP)  # 0.01
+
+    # Ключ для обновления number_input после rerun
+    monetary_key = st.session_state.get("monetary_key", 0)
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        m2_raw = st.number_input("для сегмента 2", min_value=min_float, max_value=max_float, value=float(vals_m[0]), step=step_float, key=f"monetary_m2_{monetary_key}")
+        m2_d = Decimal(str(m2_raw)).quantize(COUNTER_STEP, rounding=ROUND_HALF_UP)
+        if m2_d < COUNTER_MIN:
+            m2_d = COUNTER_MIN
+        if m2_d != vals_m[0]:
+            vals_m[0] = m2_d
+            st.session_state.monetary_values = vals_m
+            st.session_state.monetary_key = monetary_key + 1
+            st.rerun()
+    with c2:
+        m3_raw = st.number_input("для сегмента 3", min_value=min_float, max_value=max_float, value=float(vals_m[1]), step=step_float, key=f"monetary_m3_{monetary_key}")
+        m3_d = Decimal(str(m3_raw)).quantize(COUNTER_STEP, rounding=ROUND_HALF_UP)
+        if m3_d < COUNTER_MIN:
+            m3_d = COUNTER_MIN
+        if m3_d != vals_m[1]:
+            vals_m[1] = m3_d
+            st.session_state.monetary_values = vals_m
+            st.session_state.monetary_key = monetary_key + 1
+            st.rerun()
+    with c3:
+        m4_raw = st.number_input("для сегмента 4", min_value=min_float, max_value=max_float, value=float(vals_m[2]), step=step_float, key=f"monetary_m4_{monetary_key}")
+        m4_d = Decimal(str(m4_raw)).quantize(COUNTER_STEP, rounding=ROUND_HALF_UP)
+        if m4_d < COUNTER_MIN:
+            m4_d = COUNTER_MIN
+        if m4_d != vals_m[2]:
+            vals_m[2] = m4_d
+            st.session_state.monetary_values = vals_m
+            st.session_state.monetary_key = monetary_key + 1
+            st.rerun()
+
+    # Сохраняем точные Decimal значения
+    st.session_state.monetary_values = [m2_d, m3_d, m4_d]
+
+    # DEBUG: отображение значений
+    st.write(f"DEBUG: m2 = {vals_m[0]}, m3 = {vals_m[1]}, m4 = {vals_m[2]}")
 
 
 def render_cohort_analysis() -> None:
