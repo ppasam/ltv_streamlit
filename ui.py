@@ -487,7 +487,7 @@ def render_rfm_analysis() -> None:
     st.subheader("Кол-во клиентов, сделавших n покупок (Frequency)")
     st.dataframe(frequency_data, use_container_width=True, hide_index=True)
 
-    st.subheader("Кол-во клиентов, сделавших покупки на сумму \"с - по\" (Monetary)")
+    st.subheader("Задаем суммы покупок для сегментов M - Monetary")
 
     # Параметры счетчиков (только Decimal)
     COUNTER_MIN = Decimal("0.02")
