@@ -478,7 +478,7 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         st.session_state.rfm_key_r = key_r + 1
         st.rerun()
 
-recency_data = [
+    recency_data = [
         {"с": 0, "по": r2_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента R": 1},
         {"с": r2_n, "по": r3_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента R": 2},
         {"с": r3_n, "по": r4_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента R": 3},
