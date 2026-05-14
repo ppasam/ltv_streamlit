@@ -650,15 +650,13 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
     # Таблица диапазонов Monetary
     st.markdown("**Кол-во клиентов, сделавших покупок на сумму \"с - по\" (Monetary)**")
     table_data = [
-        {"с": Decimal("0.01"), "по": m2_d - COUNTER_STEP, "Кол-во клиентов": "", "Доля": "", "№ сегмента M": 4},
-        {"с": m2_d, "по": m3_d - COUNTER_STEP, "Кол-во клиентов": "", "Доля": "", "№ сегмента M": 3},
-        {"с": m3_d, "по": m4_d - COUNTER_STEP, "Кол-во клиентов": "", "Доля": "", "№ сегмента M": 2},
-        {"с": m4_d, "по": max_monetary, "Кол-во клиентов": "", "Доля": "", "№ сегмента M": 1},
+        {"с": Decimal("0.01"), "по": m2_d - COUNTER_STEP, "№ сегмента M": 4},
+        {"с": m2_d, "по": m3_d - COUNTER_STEP, "№ сегмента M": 3},
+        {"с": m3_d, "по": m4_d - COUNTER_STEP, "№ сегмента M": 2},
+        {"с": m4_d, "по": max_monetary, "№ сегмента M": 1},
     ]
     st.table({"с": [str(row["с"].quantize(COUNTER_STEP)) for row in table_data],
               "по": [str(row["по"].quantize(COUNTER_STEP)) for row in table_data],
-              "Кол-во клиентов": [row["Кол-во клиентов"] for row in table_data],
-              "Доля": [row["Доля"] for row in table_data],
               "№ сегмента M": [row["№ сегмента M"] for row in table_data]})
 
 
