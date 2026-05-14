@@ -479,10 +479,10 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         st.rerun()
 
     recency_data = [
-        {"дата - с": (end_date - timedelta(days=r2_n - 1)).strftime("%Y-%m-%d"), "с": 0, "по": r2_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента R": 1},
-        {"дата - с": (end_date - timedelta(days=r3_n - 1)).strftime("%Y-%m-%d"), "с": r2_n, "по": r3_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента R": 2},
-        {"дата - с": (end_date - timedelta(days=r4_n - 1)).strftime("%Y-%m-%d"), "с": r3_n, "по": r4_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента R": 3},
-        {"дата - с": (end_date - timedelta(days=max_r)).strftime("%Y-%m-%d"), "с": r4_n, "по": max_r, "Кол-во клиентов": "", "Доля": "", "№ сегмента R": 4},
+        {"дата - с": (end_date - timedelta(days=r2_n - 1)).strftime("%Y-%m-%d"), "с": 0, "по": r2_n - 1, "№ сегмента R": 1},
+        {"дата - с": (end_date - timedelta(days=r3_n - 1)).strftime("%Y-%m-%d"), "с": r2_n, "по": r3_n - 1, "№ сегмента R": 2},
+        {"дата - с": (end_date - timedelta(days=r4_n - 1)).strftime("%Y-%m-%d"), "с": r3_n, "по": r4_n - 1, "№ сегмента R": 3},
+        {"дата - с": (end_date - timedelta(days=max_r)).strftime("%Y-%m-%d"), "с": r4_n, "по": max_r, "№ сегмента R": 4},
     ]
     st.subheader("Кол-во клиентов, сделавших последнюю покупку в период \"с - по\" дней назад (Recency)")
     st.dataframe(recency_data, use_container_width=True, hide_index=True)
@@ -650,13 +650,15 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
     # Таблица диапазонов Monetary
     st.markdown("**Кол-во клиентов, сделавших покупок на сумму \"с - по\" (Monetary)**")
     table_data = [
-        {"с": Decimal("0.01"), "по": m2_d - COUNTER_STEP, "№ сегмента M": 4},
-        {"с": m2_d, "по": m3_d - COUNTER_STEP, "№ сегмента M": 3},
-        {"с": m3_d, "по": m4_d - COUNTER_STEP, "№ сегмента M": 2},
-        {"с": m4_d, "по": max_monetary, "№ сегмента M": 1},
+        {"с": Decimal("0.01"), "по": m2_d - COUNTER_STEP, "Кол-во клиентов": "", "Доля": "", "№ сегмента M": 4},
+        {"с": m2_d, "по": m3_d - COUNTER_STEP, "Кол-во клиентов": "", "Доля": "", "№ сегмента M": 3},
+        {"с": m3_d, "по": m4_d - COUNTER_STEP, "Кол-во клиентов": "", "Доля": "", "№ сегмента M": 2},
+        {"с": m4_d, "по": max_monetary, "Кол-во клиентов": "", "Доля": "", "№ сегмента M": 1},
     ]
     st.table({"с": [str(row["с"].quantize(COUNTER_STEP)) for row in table_data],
               "по": [str(row["по"].quantize(COUNTER_STEP)) for row in table_data],
+              "Кол-во клиентов": [row["Кол-во клиентов"] for row in table_data],
+              "Доля": [row["Доля"] for row in table_data],
               "№ сегмента M": [row["№ сегмента M"] for row in table_data]})
 
 
