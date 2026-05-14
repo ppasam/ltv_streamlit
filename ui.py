@@ -426,26 +426,26 @@ def create_financial_counter(
     return current_value
 
 
-def render_rfm_analysis() -> None:
+def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
     """Render RFM анализ section."""
     st.header("RFM анализ")
 
+    max_r = (end_date - start_date).days
+    if max_r < 2:
+        max_r = 2
+
     if "rfm_values_r" not in st.session_state:
-        st.session_state.rfm_values_r = [2, 3, 5]
+        st.session_state.rfm_values_r = [30, 90, 365]
     if "rfm_key_r" not in st.session_state:
         st.session_state.rfm_key_r = 0
 
-    max_orders = st.session_state.get("max_orders_per_customer", 37)
-    if max_orders < 2:
-        max_orders = 37
-
-    max_f2 = max_orders - 2
-    max_f3 = max_orders - 1
-    max_f4 = max_orders
-    if max_f2 < 2:
-        max_f2 = 2
-        max_f3 = 3
-        max_f4 = 4
+    max_r2 = max_r
+    max_r3 = max_r
+    max_r4 = max_r
+    if max_r2 < 30:
+        max_r2 = 30
+        max_r3 = 90
+        max_r4 = max_r
 
     vals_r = st.session_state.rfm_values_r
     key_r = st.session_state.rfm_key_r
@@ -454,11 +454,11 @@ def render_rfm_analysis() -> None:
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        r2 = st.number_input("для сегмента 2", min_value=2, max_value=max_f2, value=min(vals_r[0], max_f2), key=f"r2_{key_r}")
+        r2 = st.number_input("для сегмента 2", min_value=2, max_value=max_r2, value=min(vals_r[0], max_r2), key=f"r2_{key_r}")
     with c2:
-        r3 = st.number_input("для сегмента 3", min_value=2, max_value=max_f3, value=min(vals_r[1], max_f3), key=f"r3_{key_r}")
+        r3 = st.number_input("для сегмента 3", min_value=2, max_value=max_r3, value=min(vals_r[1], max_r3), key=f"r3_{key_r}")
     with c3:
-        r4 = st.number_input("для сегмента 4", min_value=2, max_value=max_f4, value=min(vals_r[2], max_f4), key=f"r4_{key_r}")
+        r4 = st.number_input("для сегмента 4", min_value=2, max_value=max_r4, value=min(vals_r[2], max_r4), key=f"r4_{key_r}")
 
     r2_n, r3_n, r4_n = r2, r3, r4
 
@@ -466,12 +466,12 @@ def render_rfm_analysis() -> None:
         r3_n = r2_n + 1
     if r3_n >= r4_n:
         r4_n = r3_n + 1
-    if r4_n > max_f4:
-        r4_n = max_f4
-    if r3_n > max_f3:
-        r3_n = max_f3
-    if r2_n > max_f2:
-        r2_n = max_f2
+    if r4_n > max_r4:
+        r4_n = max_r4
+    if r3_n > max_r3:
+        r3_n = max_r3
+    if r2_n > max_r2:
+        r2_n = max_r2
 
     if r2_n != vals_r[0] or r3_n != vals_r[1] or r4_n != vals_r[2]:
         st.session_state.rfm_values_r = [r2_n, r3_n, r4_n]
@@ -679,6 +679,6 @@ def render_section(section: str, start_date: datetime, end_date: datetime, **kwa
             kwargs.get("is_days", False)
         )
     elif section == "RFM анализ":
-        render_rfm_analysis()
+        render_rfm_analysis(start_date, end_date)
     elif section == "Когортный анализ":
         render_cohort_analysis()
