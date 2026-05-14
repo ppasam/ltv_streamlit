@@ -479,7 +479,7 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         st.rerun()
 
     recency_data = [
-        {"с": 1, "по": r2_n - 1, "№ сегмента R": 1},
+        {"с": 0, "по": r2_n - 1, "№ сегмента R": 1},
         {"с": r2_n, "по": r3_n - 1, "№ сегмента R": 2},
         {"с": r3_n, "по": r4_n - 1, "№ сегмента R": 3},
         {"с": r4_n, "по": max_r, "№ сегмента R": 4},
