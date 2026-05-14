@@ -487,53 +487,95 @@ def render_rfm_analysis() -> None:
     st.subheader("Кол-во клиентов, сделавших n покупок (Frequency)")
     st.dataframe(frequency_data, use_container_width=True, hide_index=True)
 
-    st.subheader("Кол-во клиентов, сделавших покупок на сумму \"с - по\" (Monetary)")
+    st.subheader("Кол-во клиентов, сделавших покупки на сумму \"с - по\" (Monetary)")
 
     # Параметры счетчиков (только Decimal)
     COUNTER_MIN = Decimal("0.02")
-    COUNTER_MAX = Decimal("10.00")
     COUNTER_STEP = Decimal("0.01")
+    MIN_DIFF = COUNTER_STEP
+
+    # Получаем max_monetary из "Общий анализ"
+    max_monetary = st.session_state.get("max_monetary_per_customer", Decimal("0.02"))
+    max_monetary = Decimal(str(max_monetary))
 
     # Инициализация session_state если отсутствует
     if "monetary_values" not in st.session_state:
         st.session_state.monetary_values = [COUNTER_MIN, COUNTER_MIN + COUNTER_STEP, COUNTER_MIN + COUNTER_STEP * 2]
 
-    vals_m = st.session_state.monetary_values
+    vals_m = list(st.session_state.monetary_values)
+
+    # Для отслеживания изменений храним предыдущие значения
+    prev_vals = st.session_state.get("monetary_prev_values", None)
+
+    # Определяем какой счетчик изменился
+    changed_idx = -1
+    if prev_vals is not None:
+        for i in range(3):
+            if vals_m[i] != prev_vals[i]:
+                changed_idx = i
+                break
+
+    # Если есть изменение - применяем правила распространения
+    if changed_idx >= 0:
+        new_vals = list(vals_m)
+        if new_vals[changed_idx] > prev_vals[changed_idx]:
+            for i in range(changed_idx, 2):
+                required = new_vals[i] + MIN_DIFF
+                if new_vals[i + 1] < required:
+                    new_vals[i + 1] = required
+        else:
+            for i in range(changed_idx, 0, -1):
+                required = new_vals[i] - MIN_DIFF
+                if new_vals[i - 1] > required:
+                    new_vals[i - 1] = required
+
+        # Также корректируем вверх для max_monetary
+        new_vals[2] = min(new_vals[2], max_monetary)
+        new_vals[1] = min(new_vals[1], new_vals[2] - MIN_DIFF)
+        new_vals[0] = min(new_vals[0], new_vals[1] - MIN_DIFF)
+
+        if new_vals != vals_m:
+            vals_m = new_vals
+            st.session_state.monetary_values = vals_m
+            st.session_state.monetary_prev_values = list(vals_m)
+            st.rerun()
+
+    # Сохраняем текущие значения для следующего рендера
+    st.session_state.monetary_prev_values = list(vals_m)
 
     # Конвертируем Decimal в float для number_input (только для отображения)
-    min_float = float(Decimal("0.019"))  # 0.019 чтобы 0.03-0.01 > min_value и кнопка была активна
-    max_float = float(COUNTER_MAX)  # 10.00
-    step_float = float(COUNTER_STEP)  # 0.01
+    # Для каждого сегмента свое min и max
+    min_float_m2 = float(Decimal("0.019"))
+    min_float_m3 = float(Decimal("0.029"))
+    min_float_m4 = float(Decimal("0.039"))
+    max_float_m2 = max(min_float_m2, float(max_monetary - Decimal("0.02")))  # a - 0.02, but >= min
+    max_float_m3 = max(min_float_m3, float(max_monetary - Decimal("0.01")))  # a - 0.01, but >= min
+    max_float_m4 = max(min_float_m4, float(max_monetary))  # a, but >= min
+    step_float = float(COUNTER_STEP)
 
     # Ключ для обновления number_input после rerun
     monetary_key = st.session_state.get("monetary_key", 0)
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        m2_raw = st.number_input("для сегмента 2", min_value=min_float, max_value=max_float, value=float(vals_m[0]), step=step_float, key=f"monetary_m2_{monetary_key}")
+        m2_raw = st.number_input("для сегмента 2", min_value=min_float_m2, max_value=max_float_m2, value=float(vals_m[0]), step=step_float, key=f"monetary_m2_{monetary_key}")
         m2_d = Decimal(str(m2_raw)).quantize(COUNTER_STEP, rounding=ROUND_HALF_UP)
-        if m2_d < COUNTER_MIN:
-            m2_d = COUNTER_MIN
         if m2_d != vals_m[0]:
             vals_m[0] = m2_d
             st.session_state.monetary_values = vals_m
             st.session_state.monetary_key = monetary_key + 1
             st.rerun()
     with c2:
-        m3_raw = st.number_input("для сегмента 3", min_value=min_float, max_value=max_float, value=float(vals_m[1]), step=step_float, key=f"monetary_m3_{monetary_key}")
+        m3_raw = st.number_input("для сегмента 3", min_value=min_float_m3, max_value=max_float_m3, value=float(vals_m[1]), step=step_float, key=f"monetary_m3_{monetary_key}")
         m3_d = Decimal(str(m3_raw)).quantize(COUNTER_STEP, rounding=ROUND_HALF_UP)
-        if m3_d < COUNTER_MIN:
-            m3_d = COUNTER_MIN
         if m3_d != vals_m[1]:
             vals_m[1] = m3_d
             st.session_state.monetary_values = vals_m
             st.session_state.monetary_key = monetary_key + 1
             st.rerun()
     with c3:
-        m4_raw = st.number_input("для сегмента 4", min_value=min_float, max_value=max_float, value=float(vals_m[2]), step=step_float, key=f"monetary_m4_{monetary_key}")
+        m4_raw = st.number_input("для сегмента 4", min_value=min_float_m4, max_value=max_float_m4, value=float(vals_m[2]), step=step_float, key=f"monetary_m4_{monetary_key}")
         m4_d = Decimal(str(m4_raw)).quantize(COUNTER_STEP, rounding=ROUND_HALF_UP)
-        if m4_d < COUNTER_MIN:
-            m4_d = COUNTER_MIN
         if m4_d != vals_m[2]:
             vals_m[2] = m4_d
             st.session_state.monetary_values = vals_m
@@ -542,9 +584,6 @@ def render_rfm_analysis() -> None:
 
     # Сохраняем точные Decimal значения
     st.session_state.monetary_values = [m2_d, m3_d, m4_d]
-
-    # DEBUG: отображение значений
-    st.write(f"DEBUG: m2 = {vals_m[0]}, m3 = {vals_m[1]}, m4 = {vals_m[2]}")
 
 
 def render_cohort_analysis() -> None:
