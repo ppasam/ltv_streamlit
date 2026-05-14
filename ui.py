@@ -500,7 +500,10 @@ def render_rfm_analysis() -> None:
 
     # Инициализация session_state если отсутствует
     if "monetary_values" not in st.session_state:
-        st.session_state.monetary_values = [COUNTER_MIN, COUNTER_MIN + COUNTER_STEP, COUNTER_MIN + COUNTER_STEP * 2]
+        if max_monetary > Decimal("25000.00"):
+            st.session_state.monetary_values = [Decimal("3000.00"), Decimal("10000.00"), Decimal("25000.00")]
+        else:
+            st.session_state.monetary_values = [max_monetary - Decimal("0.02"), max_monetary - Decimal("0.01"), max_monetary]
 
     vals_m = list(st.session_state.monetary_values)
 
