@@ -482,7 +482,7 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         {"с": 1, "по": r2_n - 1, "№ сегмента R": 1},
         {"с": r2_n, "по": r3_n - 1, "№ сегмента R": 2},
         {"с": r3_n, "по": r4_n - 1, "№ сегмента R": 3},
-        {"с": r4_n, "по": max_orders, "№ сегмента R": 4},
+        {"с": r4_n, "по": max_r, "№ сегмента R": 4},
     ]
     st.subheader("Кол-во клиентов, сделавших последнюю покупку в период \"с - по\" дней назад (Recency)")
     st.dataframe(recency_data, use_container_width=True, hide_index=True)
