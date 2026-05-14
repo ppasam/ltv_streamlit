@@ -430,15 +430,15 @@ def render_rfm_analysis() -> None:
     """Render RFM анализ section."""
     st.header("RFM анализ")
 
-    if "rfm_values" not in st.session_state:
-        st.session_state.rfm_values = [2, 3, 5]
-    if "rfm_key" not in st.session_state:
-        st.session_state.rfm_key = 0
+    if "rfm_values_r" not in st.session_state:
+        st.session_state.rfm_values_r = [2, 3, 5]
+    if "rfm_key_r" not in st.session_state:
+        st.session_state.rfm_key_r = 0
 
     max_orders = st.session_state.get("max_orders_per_customer", 37)
     if max_orders < 2:
         max_orders = 37
-    
+
     max_f2 = max_orders - 2
     max_f3 = max_orders - 1
     max_f4 = max_orders
@@ -447,18 +447,77 @@ def render_rfm_analysis() -> None:
         max_f3 = 3
         max_f4 = 4
 
-    vals = st.session_state.rfm_values
-    key = st.session_state.rfm_key
+    vals_r = st.session_state.rfm_values_r
+    key_r = st.session_state.rfm_key_r
+
+    st.subheader("Задаем количество дней для периодов сегментов R - Recency")
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        r2 = st.number_input("для сегмента 2", min_value=2, max_value=max_f2, value=min(vals_r[0], max_f2), key=f"r2_{key_r}")
+    with c2:
+        r3 = st.number_input("для сегмента 3", min_value=2, max_value=max_f3, value=min(vals_r[1], max_f3), key=f"r3_{key_r}")
+    with c3:
+        r4 = st.number_input("для сегмента 4", min_value=2, max_value=max_f4, value=min(vals_r[2], max_f4), key=f"r4_{key_r}")
+
+    r2_n, r3_n, r4_n = r2, r3, r4
+
+    if r2_n >= r3_n:
+        r3_n = r2_n + 1
+    if r3_n >= r4_n:
+        r4_n = r3_n + 1
+    if r4_n > max_f4:
+        r4_n = max_f4
+    if r3_n > max_f3:
+        r3_n = max_f3
+    if r2_n > max_f2:
+        r2_n = max_f2
+
+    if r2_n != vals_r[0] or r3_n != vals_r[1] or r4_n != vals_r[2]:
+        st.session_state.rfm_values_r = [r2_n, r3_n, r4_n]
+        st.session_state.rfm_key_r = key_r + 1
+        st.rerun()
+
+    recency_data = [
+        {"с": 1, "по": r2_n - 1, "№ сегмента R": 1},
+        {"с": r2_n, "по": r3_n - 1, "№ сегмента R": 2},
+        {"с": r3_n, "по": r4_n - 1, "№ сегмента R": 3},
+        {"с": r4_n, "по": max_orders, "№ сегмента R": 4},
+    ]
+    st.subheader("Кол-во клиентов, сделавших последнюю покупку в период \"с - по\" дней назад (Recency)")
+    st.dataframe(recency_data, use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    if "rfm_values_f" not in st.session_state:
+        st.session_state.rfm_values_f = [2, 3, 5]
+    if "rfm_key_f" not in st.session_state:
+        st.session_state.rfm_key_f = 0
+
+    max_orders = st.session_state.get("max_orders_per_customer", 37)
+    if max_orders < 2:
+        max_orders = 37
+
+    max_f2 = max_orders - 2
+    max_f3 = max_orders - 1
+    max_f4 = max_orders
+    if max_f2 < 2:
+        max_f2 = 2
+        max_f3 = 3
+        max_f4 = 4
+
+    vals_f = st.session_state.rfm_values_f
+    key_f = st.session_state.rfm_key_f
 
     st.subheader("Задаем количество покупок для сегментов F - Frequency")
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        f2 = st.number_input("для сегмента 2", min_value=2, max_value=max_f2, value=min(vals[0], max_f2), key=f"f2_{key}")
+        f2 = st.number_input("для сегмента 2", min_value=2, max_value=max_f2, value=min(vals_f[0], max_f2), key=f"f2_{key_f}")
     with c2:
-        f3 = st.number_input("для сегмента 3", min_value=2, max_value=max_f3, value=min(vals[1], max_f3), key=f"f3_{key}")
+        f3 = st.number_input("для сегмента 3", min_value=2, max_value=max_f3, value=min(vals_f[1], max_f3), key=f"f3_{key_f}")
     with c3:
-        f4 = st.number_input("для сегмента 4", min_value=2, max_value=max_f4, value=min(vals[2], max_f4), key=f"f4_{key}")
+        f4 = st.number_input("для сегмента 4", min_value=2, max_value=max_f4, value=min(vals_f[2], max_f4), key=f"f4_{key_f}")
 
     f2_n, f3_n, f4_n = f2, f3, f4
 
@@ -473,9 +532,9 @@ def render_rfm_analysis() -> None:
     if f2_n > max_f2:
         f2_n = max_f2
 
-    if f2_n != vals[0] or f3_n != vals[1] or f4_n != vals[2]:
-        st.session_state.rfm_values = [f2_n, f3_n, f4_n]
-        st.session_state.rfm_key = key + 1
+    if f2_n != vals_f[0] or f3_n != vals_f[1] or f4_n != vals_f[2]:
+        st.session_state.rfm_values_f = [f2_n, f3_n, f4_n]
+        st.session_state.rfm_key_f = key_f + 1
         st.rerun()
 
     frequency_data = [
@@ -587,6 +646,18 @@ def render_rfm_analysis() -> None:
 
     # Сохраняем точные Decimal значения
     st.session_state.monetary_values = [m2_d, m3_d, m4_d]
+
+    # Таблица диапазонов Monetary
+    st.markdown("**Кол-во клиентов, сделавших покупок на сумму \"с - по\" (Monetary)**")
+    table_data = [
+        {"с": Decimal("0.01"), "по": m2_d - COUNTER_STEP, "№ сегмента M": 4},
+        {"с": m2_d, "по": m3_d - COUNTER_STEP, "№ сегмента M": 3},
+        {"с": m3_d, "по": m4_d - COUNTER_STEP, "№ сегмента M": 2},
+        {"с": m4_d, "по": max_monetary, "№ сегмента M": 1},
+    ]
+    st.table({"с": [str(row["с"].quantize(COUNTER_STEP)) for row in table_data],
+              "по": [str(row["по"].quantize(COUNTER_STEP)) for row in table_data],
+              "№ сегмента M": [row["№ сегмента M"] for row in table_data]})
 
 
 def render_cohort_analysis() -> None:
