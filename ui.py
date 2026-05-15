@@ -840,6 +840,19 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         </div>
         """, unsafe_allow_html=True)
 
+        st.markdown("""
+        <div class="rf-legend">
+        <b>Легенда RF матрицы</b>
+        <table>
+        <tr><th></th><th>R-4</th><th>R-3</th><th>R-2</th><th>R-1</th></tr>
+        <tr><td><b>F-1</b></td><td>Ушедшие</td><td>Уходящие VIP</td><td>Уходящие VIP</td><td>VIP</td></tr>
+        <tr><td><b>F-2</b></td><td>Ушедшие</td><td>Уходящие</td><td>Норма</td><td>Норма</td></tr>
+        <tr><td><b>F-3</b></td><td>Ушедшие</td><td>Уходящие</td><td>Норма</td><td>Норма</td></tr>
+        <tr><td><b>F-4</b></td><td>Ушедшие</td><td>Одноразовые</td><td>Норма</td><td>Новички</td></tr>
+        </table>
+        </div>
+        """, unsafe_allow_html=True)
+
 
 def render_cohort_analysis() -> None:
     """Render Когортный анализ section."""
