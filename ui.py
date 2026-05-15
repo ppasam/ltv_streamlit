@@ -845,10 +845,10 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         <b>Легенда RF матрицы</b>
         <table>
         <tr><th></th><th>R-4</th><th>R-3</th><th>R-2</th><th>R-1</th></tr>
-        <tr><td><b>F-1</b></td><td>Ушедшие</td><td>Уходящие VIP</td><td>Уходящие VIP</td><td>VIP</td></tr>
-        <tr><td><b>F-2</b></td><td>Ушедшие</td><td>Уходящие</td><td>Норма</td><td>Норма</td></tr>
-        <tr><td><b>F-3</b></td><td>Ушедшие</td><td>Уходящие</td><td>Норма</td><td>Норма</td></tr>
-        <tr><td><b>F-4</b></td><td>Ушедшие</td><td>Одноразовые</td><td>Норма</td><td>Новички</td></tr>
+        <tr><td><b>F-1</b></td><td style="background:#999999; color:white;">Ушедшие</td><td style="background:#FF8C00; color:white;">Уходящие VIP</td><td style="background:#FF8C00; color:white;">Уходящие VIP</td><td style="background:#FFD700; color:black;">VIP</td></tr>
+        <tr><td><b>F-2</b></td><td style="background:#999999; color:white;">Ушедшие</td><td style="background:#FF7043; color:white;">Уходящие</td><td style="background:#42A5F5; color:white;">Норма</td><td style="background:#42A5F5; color:white;">Норма</td></tr>
+        <tr><td><b>F-3</b></td><td style="background:#999999; color:white;">Ушедшие</td><td style="background:#FF7043; color:white;">Уходящие</td><td style="background:#42A5F5; color:white;">Норма</td><td style="background:#42A5F5; color:white;">Норма</td></tr>
+        <tr><td><b>F-4</b></td><td style="background:#999999; color:white;">Ушедшие</td><td style="background:#26A69A; color:white;">Одноразовые</td><td style="background:#42A5F5; color:white;">Норма</td><td style="background:#66BB6A; color:white;">Новички</td></tr>
         </table>
         </div>
         """, unsafe_allow_html=True)
