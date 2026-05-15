@@ -620,6 +620,31 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
     st.subheader("Кол-во клиентов, сделавших n покупок (Frequency)")
     st.dataframe(frequency_data, use_container_width=True, hide_index=True)
 
+    # Assign Frequency_Segment to clients
+    if clients_df is not None and not clients_df.empty:
+        freq_max_sorted = sorted([(row["max n"], row["№ сегмента F"]) for row in frequency_data], key=lambda x: x[0])
+        def get_frequency_segment(num_orders_val):
+            for max_n, segment in freq_max_sorted:
+                if num_orders_val <= max_n:
+                    return segment
+            return frequency_data[-1]["№ сегмента F"]
+        clients_df["Frequency_Segment"] = clients_df["num_orders"].apply(get_frequency_segment)
+
+        # Save Frequency_Segment to database
+        db_url = data_loader.get_database_url()
+        conn = psycopg2.connect(db_url)
+        cur = conn.cursor()
+        cur.execute("""
+            ALTER TABLE clients ADD COLUMN IF NOT EXISTS Frequency_Segment INTEGER
+        """)
+        for _, row in clients_df.iterrows():
+            cur.execute("""
+                UPDATE clients SET Frequency_Segment = %s WHERE client_id = %s
+            """, (int(row["Frequency_Segment"]), int(row["client_id"])))
+        conn.commit()
+        cur.close()
+        conn.close()
+
     st.divider()
 
     st.subheader("Задаем суммы покупок для сегментов M - Monetary")
@@ -760,6 +785,31 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
     ]
     st.subheader("Кол-во клиентов, сделавших покупок на сумму \"с - по\" (Monetary)")
     st.dataframe([{"с": str(row["с"].quantize(COUNTER_STEP)), "по": str(row["по"].quantize(COUNTER_STEP)), "Кол-во клиентов": row["Кол-во клиентов"], "Доля": row["Доля"], "№ сегмента M": row["№ сегмента M"]} for row in table_data], use_container_width=True, hide_index=True)
+
+    # Assign Monetary_Segment to clients
+    if clients_df is not None and not clients_df.empty:
+        m_po_sorted = sorted([(row["по"], row["№ сегмента M"]) for row in table_data], key=lambda x: x[0])
+        def get_monetary_segment(total_amount_val):
+            for po_val, segment in m_po_sorted:
+                if total_amount_val <= po_val:
+                    return segment
+            return table_data[-1]["№ сегмента M"]
+        clients_df["Monetary_Segment"] = clients_df["total_amount"].apply(get_monetary_segment)
+
+        # Save Monetary_Segment to database
+        db_url = data_loader.get_database_url()
+        conn = psycopg2.connect(db_url)
+        cur = conn.cursor()
+        cur.execute("""
+            ALTER TABLE clients ADD COLUMN IF NOT EXISTS Monetary_Segment INTEGER
+        """)
+        for _, row in clients_df.iterrows():
+            cur.execute("""
+                UPDATE clients SET Monetary_Segment = %s WHERE client_id = %s
+            """, (int(row["Monetary_Segment"]), int(row["client_id"])))
+        conn.commit()
+        cur.close()
+        conn.close()
 
 
 def render_cohort_analysis() -> None:
