@@ -906,7 +906,7 @@ def render_cohort_analysis(cohort_dates: list) -> None:
         if not clients_df.empty and "first_order_date_dt" in clients_df.columns:
             mask = (clients_df["first_order_date_dt"] >= date_start) & (clients_df["first_order_date_dt"] <= date_end)
             client_count = int(clients_df[mask].shape[0])
-            total_sum = f"{float(clients_df.loc[mask, 'total_amount'].sum()):,.2f}" if "total_amount" in clients_df.columns else ""
+            total_sum = f"${float(clients_df.loc[mask, 'total_amount'].sum()):,.2f}" if "total_amount" in clients_df.columns else ""
         else:
             client_count = ""
             total_sum = ""
