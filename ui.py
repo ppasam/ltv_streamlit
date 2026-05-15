@@ -540,10 +540,10 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         st.rerun()
 
     frequency_data = [
-        {"min n": 1, "max n": f2_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента F": 4},
-        {"min n": f2_n, "max n": f3_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента F": 3},
-        {"min n": f3_n, "max n": f4_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента F": 2},
-        {"min n": f4_n, "max n": max_orders, "Кол-во клиентов": "", "Доля": "", "№ сегмента F": 1},
+        {"min n": 1, "max n": f2_n - 1, "№ сегмента F": 4},
+        {"min n": f2_n, "max n": f3_n - 1, "№ сегмента F": 3},
+        {"min n": f3_n, "max n": f4_n - 1, "№ сегмента F": 2},
+        {"min n": f4_n, "max n": max_orders, "№ сегмента F": 1},
     ]
     st.subheader("Кол-во клиентов, сделавших n покупок (Frequency)")
     st.dataframe(frequency_data, use_container_width=True, hide_index=True)
@@ -651,10 +651,10 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
 
     # Таблица диапазонов Monetary
     table_data = [
-        {"с": Decimal("0.01"), "по": m2_d - COUNTER_STEP, "Кол-во клиентов": "", "Доля": "", "№ сегмента M": 4},
-        {"с": m2_d, "по": m3_d - COUNTER_STEP, "Кол-во клиентов": "", "Доля": "", "№ сегмента M": 3},
-        {"с": m3_d, "по": m4_d - COUNTER_STEP, "Кол-во клиентов": "", "Доля": "", "№ сегмента M": 2},
-        {"с": m4_d, "по": max_monetary, "Кол-во клиентов": "", "Доля": "", "№ сегмента M": 1},
+        {"с": Decimal("0.01"), "по": m2_d - COUNTER_STEP, "№ сегмента M": 4},
+        {"с": m2_d, "по": m3_d - COUNTER_STEP, "№ сегмента M": 3},
+        {"с": m3_d, "по": m4_d - COUNTER_STEP, "№ сегмента M": 2},
+        {"с": m4_d, "по": max_monetary, "№ сегмента M": 1},
     ]
     st.subheader("Кол-во клиентов, сделавших покупок на сумму \"с - по\" (Monetary)")
     st.dataframe([{"с": str(row["с"].quantize(COUNTER_STEP)), "по": str(row["по"].quantize(COUNTER_STEP)), "№ сегмента M": row["№ сегмента M"]} for row in table_data], use_container_width=True, hide_index=True)
