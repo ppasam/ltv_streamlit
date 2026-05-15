@@ -566,6 +566,17 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
 
     vals_m = list(st.session_state.monetary_values_m)
 
+    min_m2 = Decimal("0.019")
+    min_m3 = Decimal("0.029")
+    min_m4 = Decimal("0.039")
+    if vals_m[0] < min_m2:
+        vals_m[0] = min_m2
+    if vals_m[1] < min_m3:
+        vals_m[1] = min_m3
+    if vals_m[2] < min_m4:
+        vals_m[2] = min_m4
+    st.session_state.monetary_values_m = vals_m
+
     # Для отслеживания изменений храним предыдущие значения
     prev_vals = st.session_state.get("monetary_prev_values_m", None)
 
