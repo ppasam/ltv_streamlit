@@ -825,6 +825,16 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
                 count = clients_df[(clients_df["Frequency_Segment"] == f) & (clients_df["Recency_Segment"] == r)].shape[0]
                 row.append(count)
             rows_data.append(row)
+        color_map = {
+            (1, 4): "#999999", (1, 3): "#FF8C00", (1, 2): "#FF8C00", (1, 1): "#FFD700",
+            (2, 4): "#999999", (2, 3): "#FF7043", (2, 2): "#42A5F5", (2, 1): "#42A5F5",
+            (3, 4): "#999999", (3, 3): "#FF7043", (3, 2): "#42A5F5", (3, 1): "#42A5F5",
+            (4, 4): "#999999", (4, 3): "#26A69A", (4, 2): "#42A5F5", (4, 1): "#66BB6A",
+        }
+        text_color_map = {
+            "#999999": "white", "#FF8C00": "white", "#FFD700": "black",
+            "#FF7043": "white", "#42A5F5": "white", "#26A69A": "white", "#66BB6A": "white",
+        }
         st.markdown("""
         <style>
         .rf-matrix table {border-collapse: collapse; width: 100%;}
@@ -835,7 +845,13 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         <div class="rf-matrix">
         <table>
         <tr><th>FR</th><th>R-4</th><th>R-3</th><th>R-2</th><th>R-1</th></tr>
-        """ + "".join(f"<tr><td>{row[0]}</td>" + "".join(f"<td>{val}</td>" for val in row[1:]) + "</tr>" for row in rows_data) + """
+        """ + "".join(
+            f"<tr><td>F-{row[0]}</td>" + "".join(
+                f"<td style=\"background:{color_map[(row[0], r_val)]}; color:{text_color_map[color_map[(row[0], r_val)]]};\">{val}</td>"
+                for r_val, val in zip([4, 3, 2, 1], row[1:])
+            ) + "</tr>"
+            for row in rows_data
+        ) + """
         </table>
         </div>
         """, unsafe_allow_html=True)
