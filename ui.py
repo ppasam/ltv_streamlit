@@ -817,14 +817,28 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
     if clients_df is not None and not clients_df.empty and "Frequency_Segment" in clients_df.columns and "Recency_Segment" in clients_df.columns:
         r_values = [4, 3, 2, 1]
         f_values = [1, 2, 3, 4]
-        matrix_data = []
+        headers = ["FR"] + [f"R-{r}" for r in r_values]
+        rows_data = []
         for f in f_values:
-            row = {"FR": f"F-{f}"}
+            row = [f"F-{f}"]
             for r in r_values:
                 count = clients_df[(clients_df["Frequency_Segment"] == f) & (clients_df["Recency_Segment"] == r)].shape[0]
-                row[f"R-{r}"] = count
-            matrix_data.append(row)
-        st.dataframe(matrix_data, use_container_width=True, hide_index=True)
+                row.append(count)
+            rows_data.append(row)
+        st.markdown("""
+        <style>
+        .rf-matrix table {border-collapse: collapse; width: 100%;}
+        .rf-matrix th, .rf-matrix td {border: 1px solid #ddd; padding: 8px; text-align: center;}
+        .rf-matrix th {background-color: #262730; color: white;}
+        .rf-matrix td:first-child {background-color: #262730; color: white; font-weight: bold;}
+        </style>
+        <div class="rf-matrix">
+        <table>
+        <tr><th>FR</th><th>R-4</th><th>R-3</th><th>R-2</th><th>R-1</th></tr>
+        """ + "".join(f"<tr><td>{row[0]}</td>" + "".join(f"<td>{val}</td>" for val in row[1:]) + "</tr>" for row in rows_data) + """
+        </table>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 def render_cohort_analysis() -> None:
