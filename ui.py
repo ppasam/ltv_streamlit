@@ -452,6 +452,8 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
 
     st.subheader("Задаем количество дней для периодов сегментов R - Recency")
 
+    st.divider()
+
     c1, c2, c3 = st.columns(3)
     with c1:
         r2 = st.number_input("для сегмента 2", min_value=2, max_value=max_r2, value=min(vals_r[0], max_r2), key=f"r2_{key_r}")
