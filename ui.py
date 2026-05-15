@@ -815,11 +815,11 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
     st.divider()
     st.subheader("RF матрица")
     if clients_df is not None and not clients_df.empty and "Frequency_Segment" in clients_df.columns and "Recency_Segment" in clients_df.columns:
-        r_values = [1, 2, 3, 4]
-        f_values = [4, 3, 2, 1]
+        r_values = [4, 3, 2, 1]
+        f_values = [1, 2, 3, 4]
         matrix_data = []
         for f in f_values:
-            row = {"F": f}
+            row = {"FR": f"F-{f}"}
             for r in r_values:
                 count = clients_df[(clients_df["Frequency_Segment"] == f) & (clients_df["Recency_Segment"] == r)].shape[0]
                 row[f"R-{r}"] = count
