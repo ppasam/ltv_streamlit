@@ -889,7 +889,12 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
 def render_cohort_analysis() -> None:
     """Render Когортный анализ section."""
     st.header("Когортный анализ")
-    st.info("🚧 В разработке")
+
+    st.subheader("Когорты клиентов")
+    cohort_table = [
+        {"Дата перв. заказа - с": "", "Номер когорты": "", "Кол-во клиентов": "", "Сумма всех их покупок": ""},
+    ]
+    st.dataframe(cohort_table, use_container_width=True, hide_index=True)
 
 
 def render_section(section: str, start_date: datetime, end_date: datetime, **kwargs) -> None:
