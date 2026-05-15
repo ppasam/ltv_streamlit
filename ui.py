@@ -563,11 +563,33 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         st.session_state.rfm_key_f = key_f + 1
         st.rerun()
 
+    frequency_counts = []
+    frequency_shares = []
+    if clients_df is not None and not clients_df.empty and "num_orders" in clients_df.columns:
+        total_orders_clients = clients_df.shape[0]
+        freq_rows = [
+            (1, f2_n - 1),
+            (f2_n, f3_n - 1),
+            (f3_n, f4_n - 1),
+            (f4_n, max_orders),
+        ]
+        for min_n, max_n in freq_rows:
+            count = clients_df[
+                (clients_df["num_orders"] >= min_n) &
+                (clients_df["num_orders"] <= max_n)
+            ].shape[0]
+            frequency_counts.append(count)
+            share = f"{(count / total_orders_clients * 100):.2f}%" if total_orders_clients > 0 else "0.00%"
+            frequency_shares.append(share)
+    else:
+        frequency_counts = [0, 0, 0, 0]
+        frequency_shares = ["0.00%", "0.00%", "0.00%", "0.00%"]
+
     frequency_data = [
-        {"min n": 1, "max n": f2_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента F": 4},
-        {"min n": f2_n, "max n": f3_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента F": 3},
-        {"min n": f3_n, "max n": f4_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента F": 2},
-        {"min n": f4_n, "max n": max_orders, "Кол-во клиентов": "", "Доля": "", "№ сегмента F": 1},
+        {"min n": 1, "max n": f2_n - 1, "Кол-во клиентов": frequency_counts[0], "Доля": frequency_shares[0], "№ сегмента F": 4},
+        {"min n": f2_n, "max n": f3_n - 1, "Кол-во клиентов": frequency_counts[1], "Доля": frequency_shares[1], "№ сегмента F": 3},
+        {"min n": f3_n, "max n": f4_n - 1, "Кол-во клиентов": frequency_counts[2], "Доля": frequency_shares[2], "№ сегмента F": 2},
+        {"min n": f4_n, "max n": max_orders, "Кол-во клиентов": frequency_counts[3], "Доля": frequency_shares[3], "№ сегмента F": 1},
     ]
     st.subheader("Кол-во клиентов, сделавших n покупок (Frequency)")
     st.dataframe(frequency_data, use_container_width=True, hide_index=True)
@@ -682,11 +704,33 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
     st.session_state.monetary_values_m = [m2_d, m3_d, m4_d]
 
     # Таблица диапазонов Monetary
+    monetary_counts = []
+    monetary_shares = []
+    if clients_df is not None and not clients_df.empty and "total_amount" in clients_df.columns:
+        total_monetary_clients = clients_df.shape[0]
+        m_rows = [
+            (Decimal("0.01"), m2_d - COUNTER_STEP),
+            (m2_d, m3_d - COUNTER_STEP),
+            (m3_d, m4_d - COUNTER_STEP),
+            (m4_d, max_monetary),
+        ]
+        for c_val, po_val in m_rows:
+            count = clients_df[
+                (clients_df["total_amount"] >= c_val) &
+                (clients_df["total_amount"] <= po_val)
+            ].shape[0]
+            monetary_counts.append(count)
+            share = f"{(count / total_monetary_clients * 100):.2f}%" if total_monetary_clients > 0 else "0.00%"
+            monetary_shares.append(share)
+    else:
+        monetary_counts = [0, 0, 0, 0]
+        monetary_shares = ["0.00%", "0.00%", "0.00%", "0.00%"]
+
     table_data = [
-        {"с": Decimal("0.01"), "по": m2_d - COUNTER_STEP, "Кол-во клиентов": "", "Доля": "", "№ сегмента M": 4},
-        {"с": m2_d, "по": m3_d - COUNTER_STEP, "Кол-во клиентов": "", "Доля": "", "№ сегмента M": 3},
-        {"с": m3_d, "по": m4_d - COUNTER_STEP, "Кол-во клиентов": "", "Доля": "", "№ сегмента M": 2},
-        {"с": m4_d, "по": max_monetary, "Кол-во клиентов": "", "Доля": "", "№ сегмента M": 1},
+        {"с": Decimal("0.01"), "по": m2_d - COUNTER_STEP, "Кол-во клиентов": monetary_counts[0], "Доля": monetary_shares[0], "№ сегмента M": 4},
+        {"с": m2_d, "по": m3_d - COUNTER_STEP, "Кол-во клиентов": monetary_counts[1], "Доля": monetary_shares[1], "№ сегмента M": 3},
+        {"с": m3_d, "по": m4_d - COUNTER_STEP, "Кол-во клиентов": monetary_counts[2], "Доля": monetary_shares[2], "№ сегмента M": 2},
+        {"с": m4_d, "по": max_monetary, "Кол-во клиентов": monetary_counts[3], "Доля": monetary_shares[3], "№ сегмента M": 1},
     ]
     st.subheader("Кол-во клиентов, сделавших покупок на сумму \"с - по\" (Monetary)")
     st.dataframe([{"с": str(row["с"].quantize(COUNTER_STEP)), "по": str(row["по"].quantize(COUNTER_STEP)), "Кол-во клиентов": row["Кол-во клиентов"], "Доля": row["Доля"], "№ сегмента M": row["№ сегмента M"]} for row in table_data], use_container_width=True, hide_index=True)
