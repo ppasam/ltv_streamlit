@@ -492,6 +492,7 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
             (r3_n, r4_n - 1),
             (r4_n, max_r),
         ]
+        total_clients = clients_df.shape[0]
         recency_counts = []
         for c, po in rows:
             date_from = end_date - timedelta(days=po)
@@ -501,12 +502,13 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
                 (clients_df["last_order_date"] <= date_to)
             ].shape[0]
             recency_counts.append(count)
+        recency_shares = [f"{(count / total_clients * 100):.2f}%" if total_clients > 0 else "0.00%" for count in recency_counts]
 
     recency_data = [
-        {"дата - с": (end_date - timedelta(days=r2_n - 1)).strftime("%Y-%m-%d"), "с": 0, "по": r2_n - 1, "Кол-во клиентов": recency_counts[0], "Доля": "", "№ сегмента R": 1},
-        {"дата - с": (end_date - timedelta(days=r3_n - 1)).strftime("%Y-%m-%d"), "с": r2_n, "по": r3_n - 1, "Кол-во клиентов": recency_counts[1], "Доля": "", "№ сегмента R": 2},
-        {"дата - с": (end_date - timedelta(days=r4_n - 1)).strftime("%Y-%m-%d"), "с": r3_n, "по": r4_n - 1, "Кол-во клиентов": recency_counts[2], "Доля": "", "№ сегмента R": 3},
-        {"дата - с": (end_date - timedelta(days=max_r - 1)).strftime("%Y-%m-%d"), "с": r4_n, "по": max_r, "Кол-во клиентов": recency_counts[3], "Доля": "", "№ сегмента R": 4},
+        {"дата - с": (end_date - timedelta(days=r2_n - 1)).strftime("%Y-%m-%d"), "с": 0, "по": r2_n - 1, "Кол-во клиентов": recency_counts[0], "Доля": recency_shares[0], "№ сегмента R": 1},
+        {"дата - с": (end_date - timedelta(days=r3_n - 1)).strftime("%Y-%m-%d"), "с": r2_n, "по": r3_n - 1, "Кол-во клиентов": recency_counts[1], "Доля": recency_shares[1], "№ сегмента R": 2},
+        {"дата - с": (end_date - timedelta(days=r4_n - 1)).strftime("%Y-%m-%d"), "с": r3_n, "по": r4_n - 1, "Кол-во клиентов": recency_counts[2], "Доля": recency_shares[2], "№ сегмента R": 3},
+        {"дата - с": (end_date - timedelta(days=max_r - 1)).strftime("%Y-%m-%d"), "с": r4_n, "по": max_r, "Кол-во клиентов": recency_counts[3], "Доля": recency_shares[3], "№ сегмента R": 4},
     ]
     st.subheader("Кол-во клиентов, сделавших последнюю покупку в период \"с - по\" дней назад (Recency)")
     st.dataframe(recency_data, use_container_width=True, hide_index=True)
