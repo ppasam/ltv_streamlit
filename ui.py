@@ -906,14 +906,16 @@ def render_cohort_analysis(cohort_dates: list) -> None:
         if not clients_df.empty and "first_order_date_dt" in clients_df.columns:
             mask = (clients_df["first_order_date_dt"] >= date_start) & (clients_df["first_order_date_dt"] <= date_end)
             client_count = int(clients_df[mask].shape[0])
+            total_sum = float(clients_df.loc[mask, "total_amount"].sum()) if "total_amount" in clients_df.columns else ""
         else:
             client_count = ""
+            total_sum = ""
 
         cohort_table.append({
             "Дата перв. заказа - с": date_start.strftime("%Y-%m-%d"),
             "Номер когорты": coh_row["cohort"],
             "Кол-во клиентов": client_count,
-            "Сумма всех их покупок": ""
+            "Сумма всех их покупок": total_sum
         })
 
     st.dataframe(cohort_table, use_container_width=True, hide_index=True)
