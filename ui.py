@@ -546,6 +546,9 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
     st.subheader("Кол-во клиентов, сделавших n покупок (Frequency)")
     st.dataframe(frequency_data, use_container_width=True, hide_index=True)
 
+    st.divider()
+    st.divider()
+
     st.subheader("Задаем суммы покупок для сегментов M - Monetary")
 
     # Параметры счетчиков (только Decimal)
