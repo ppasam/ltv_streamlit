@@ -1,6 +1,6 @@
 """UI module for LTV Streamlit application."""
 import io
-from datetime import datetime, timedelta, timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
@@ -480,11 +480,33 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         st.session_state.rfm_key_r = key_r + 1
         st.rerun()
 
+    clients_df = data_loader.load_clients_from_db()
+    recency_counts = [0, 0, 0, 0]
+    if clients_df is not None and not clients_df.empty and "last_order_date" in clients_df.columns:
+        clients_df = clients_df.copy()
+        clients_df["last_order_date"] = pd.to_datetime(clients_df["last_order_date"], format="%Y-%m-%d", errors="coerce")
+
+        rows = [
+            (0, r2_n - 1),
+            (r2_n, r3_n - 1),
+            (r3_n, r4_n - 1),
+            (r4_n, max_r),
+        ]
+        recency_counts = []
+        for c, po in rows:
+            date_from = end_date - timedelta(days=po)
+            date_to = end_date - timedelta(days=c)
+            count = clients_df[
+                (clients_df["last_order_date"] >= date_from) &
+                (clients_df["last_order_date"] <= date_to)
+            ].shape[0]
+            recency_counts.append(count)
+
     recency_data = [
-        {"дата - с": (end_date - timedelta(days=r2_n - 1)).strftime("%Y-%m-%d"), "с": 0, "по": r2_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента R": 1},
-        {"дата - с": (end_date - timedelta(days=r3_n - 1)).strftime("%Y-%m-%d"), "с": r2_n, "по": r3_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента R": 2},
-        {"дата - с": (end_date - timedelta(days=r4_n - 1)).strftime("%Y-%m-%d"), "с": r3_n, "по": r4_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента R": 3},
-        {"дата - с": (end_date - timedelta(days=max_r - 1)).strftime("%Y-%m-%d"), "с": r4_n, "по": max_r, "Кол-во клиентов": "", "Доля": "", "№ сегмента R": 4},
+        {"дата - с": (end_date - timedelta(days=r2_n - 1)).strftime("%Y-%m-%d"), "с": 0, "по": r2_n - 1, "Кол-во клиентов": recency_counts[0], "Доля": "", "№ сегмента R": 1},
+        {"дата - с": (end_date - timedelta(days=r3_n - 1)).strftime("%Y-%m-%d"), "с": r2_n, "по": r3_n - 1, "Кол-во клиентов": recency_counts[1], "Доля": "", "№ сегмента R": 2},
+        {"дата - с": (end_date - timedelta(days=r4_n - 1)).strftime("%Y-%m-%d"), "с": r3_n, "по": r4_n - 1, "Кол-во клиентов": recency_counts[2], "Доля": "", "№ сегмента R": 3},
+        {"дата - с": (end_date - timedelta(days=max_r - 1)).strftime("%Y-%m-%d"), "с": r4_n, "по": max_r, "Кол-во клиентов": recency_counts[3], "Доля": "", "№ сегмента R": 4},
     ]
     st.subheader("Кол-во клиентов, сделавших последнюю покупку в период \"с - по\" дней назад (Recency)")
     st.dataframe(recency_data, use_container_width=True, hide_index=True)

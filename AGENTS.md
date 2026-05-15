@@ -82,6 +82,30 @@ max_r = (end_date - start_date).days
 
 Calculated as `end_date - timedelta(days=по)` for each row.
 
+## Recency - "Кол-во клиентов" Calculation
+
+For each row, dates are calculated from `end_date` and columns `с`, `по`:
+- `date_from = end_date - timedelta(days=по)` — lower bound
+- `date_to = end_date - timedelta(days=с)` — upper bound
+
+Count clients where `last_order_date` is in range `[date_from, date_to]`. Example row с=0, по=29:
+- `date_from = 2014-12-31 - 29 = 2014-12-02`
+- `date_to = 2014-12-31 - 0 = 2014-12-31`
+
+## Recency - "Доля" Calculation
+
+`Доля` = `Кол-во клиентов` / total clients. (Not yet implemented)
+
+## PostgreSQL Tables
+
+`clients`, `cohorts`, `other_marketing_costs`, `promotion_costs`, `sales`
+
+### clients table columns
+
+`client_id`, `num_orders`, `first_order_date`, `last_order_date`, `total_amount`, `first_order_id`, `first_order_channel`, `cohort`
+
+Note: `last_order_date` stored as `text` in DB, parse with `format="%Y-%m-%d"` in pandas.
+
 ## Streamlit Tables - Include All Columns Explicitly
 
 `st.dataframe()` displays only columns explicitly included in the dict/list passed to it. Example:
@@ -107,4 +131,4 @@ This forces Streamlit to re-render with updated constraints.
 
 ## Git Workflow
 
-Commits are pushed directly to main. Tags used for releases (e.g., `v0.0.29`).
+Commits are pushed directly to main. Tags used for releases (e.g., `v0.0.30`).
