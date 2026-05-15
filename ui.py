@@ -617,6 +617,12 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
     max_float_m2 = max(min_float_m2, float(max_monetary - Decimal("0.02")))  # a - 0.02, but >= min
     max_float_m3 = max(min_float_m3, float(max_monetary - Decimal("0.01")))  # a - 0.01, but >= min
     max_float_m4 = max(min_float_m4, float(max_monetary))  # a, but >= min
+    if max_float_m2 < min_float_m2:
+        max_float_m2 = min_float_m2
+    if max_float_m3 < min_float_m3:
+        max_float_m3 = min_float_m3
+    if max_float_m4 < min_float_m4:
+        max_float_m4 = min_float_m4
     step_float = float(COUNTER_STEP)
 
     # Ключ для обновления number_input после rerun
