@@ -1,6 +1,6 @@
 """UI module for LTV Streamlit application."""
 import io
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
@@ -450,9 +450,9 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
     vals_r = st.session_state.rfm_values_r
     key_r = st.session_state.rfm_key_r
 
-    st.subheader("Задаем количество дней для периодов сегментов R - Recency")
-
     st.divider()
+
+    st.subheader("Задаем количество дней для периодов сегментов R - Recency")
 
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -481,10 +481,10 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         st.rerun()
 
     recency_data = [
-        {"с": 0, "по": r2_n - 1, "№ сегмента R": 1},
-        {"с": r2_n, "по": r3_n - 1, "№ сегмента R": 2},
-        {"с": r3_n, "по": r4_n - 1, "№ сегмента R": 3},
-        {"с": r4_n, "по": max_r, "№ сегмента R": 4},
+        {"дата - с": (end_date - timedelta(days=r2_n - 1)).strftime("%Y-%m-%d"), "с": 0, "по": r2_n - 1, "№ сегмента R": 1},
+        {"дата - с": (end_date - timedelta(days=r3_n - 1)).strftime("%Y-%m-%d"), "с": r2_n, "по": r3_n - 1, "№ сегмента R": 2},
+        {"дата - с": (end_date - timedelta(days=r4_n - 1)).strftime("%Y-%m-%d"), "с": r3_n, "по": r4_n - 1, "№ сегмента R": 3},
+        {"дата - с": (end_date - timedelta(days=max_r - 1)).strftime("%Y-%m-%d"), "с": r4_n, "по": max_r, "№ сегмента R": 4},
     ]
     st.subheader("Кол-во клиентов, сделавших последнюю покупку в период \"с - по\" дней назад (Recency)")
     st.dataframe(recency_data, use_container_width=True, hide_index=True)
@@ -548,8 +548,6 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
     st.subheader("Кол-во клиентов, сделавших n покупок (Frequency)")
     st.dataframe(frequency_data, use_container_width=True, hide_index=True)
 
-    st.divider()
-
     st.subheader("Задаем суммы покупок для сегментов M - Monetary")
 
     # Параметры счетчиков (только Decimal)
@@ -569,17 +567,6 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
             st.session_state.monetary_values_m = [max_monetary - Decimal("0.02"), max_monetary - Decimal("0.01"), max_monetary]
 
     vals_m = list(st.session_state.monetary_values_m)
-
-    min_m2 = Decimal("0.019")
-    min_m3 = Decimal("0.029")
-    min_m4 = Decimal("0.039")
-    if vals_m[0] < min_m2:
-        vals_m[0] = min_m2
-    if vals_m[1] < min_m3:
-        vals_m[1] = min_m3
-    if vals_m[2] < min_m4:
-        vals_m[2] = min_m4
-    st.session_state.monetary_values_m = vals_m
 
     # Для отслеживания изменений храним предыдущие значения
     prev_vals = st.session_state.get("monetary_prev_values_m", None)
@@ -663,16 +650,14 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
     st.session_state.monetary_values_m = [m2_d, m3_d, m4_d]
 
     # Таблица диапазонов Monetary
-    st.subheader("Кол-во клиентов, сделавших покупок на сумму \"с - по\" (Monetary)")
     table_data = [
         {"с": Decimal("0.01"), "по": m2_d - COUNTER_STEP, "№ сегмента M": 4},
         {"с": m2_d, "по": m3_d - COUNTER_STEP, "№ сегмента M": 3},
         {"с": m3_d, "по": m4_d - COUNTER_STEP, "№ сегмента M": 2},
         {"с": m4_d, "по": max_monetary, "№ сегмента M": 1},
     ]
-    st.table({"с": [str(row["с"].quantize(COUNTER_STEP)) for row in table_data],
-              "по": [str(row["по"].quantize(COUNTER_STEP)) for row in table_data],
-              "№ сегмента M": [row["№ сегмента M"] for row in table_data]})
+    st.subheader("Кол-во клиентов, сделавших покупок на сумму \"с - по\" (Monetary)")
+    st.dataframe([{"с": str(row["с"].quantize(COUNTER_STEP)), "по": str(row["по"].quantize(COUNTER_STEP)), "№ сегмента M": row["№ сегмента M"]} for row in table_data], use_container_width=True, hide_index=True)
 
 
 def render_cohort_analysis() -> None:
