@@ -665,7 +665,7 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         {"с": m4_d, "по": max_monetary, "Кол-во клиентов": "", "Доля": "", "№ сегмента M": 1},
     ]
     st.subheader("Кол-во клиентов, сделавших покупок на сумму \"с - по\" (Monetary)")
-    st.dataframe([{"с": str(row["с"].quantize(COUNTER_STEP)), "по": str(row["по"].quantize(COUNTER_STEP)), "№ сегмента M": row["№ сегмента M"]} for row in table_data], use_container_width=True, hide_index=True)
+    st.dataframe([{"с": str(row["с"].quantize(COUNTER_STEP)), "по": str(row["по"].quantize(COUNTER_STEP)), "Кол-во клиентов": row["Кол-во клиентов"], "Доля": row["Доля"], "№ сегмента M": row["№ сегмента M"]} for row in table_data], use_container_width=True, hide_index=True)
 
 
 def render_cohort_analysis() -> None:
