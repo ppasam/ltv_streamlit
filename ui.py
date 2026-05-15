@@ -540,10 +540,10 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         st.rerun()
 
     frequency_data = [
-        {"min n": 1, "max n": f2_n - 1, "№ сегмента F": 4},
-        {"min n": f2_n, "max n": f3_n - 1, "№ сегмента F": 3},
-        {"min n": f3_n, "max n": f4_n - 1, "№ сегмента F": 2},
-        {"min n": f4_n, "max n": max_orders, "№ сегмента F": 1},
+        {"min n": 1, "max n": f2_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента F": 4},
+        {"min n": f2_n, "max n": f3_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента F": 3},
+        {"min n": f3_n, "max n": f4_n - 1, "Кол-во клиентов": "", "Доля": "", "№ сегмента F": 2},
+        {"min n": f4_n, "max n": max_orders, "Кол-во клиентов": "", "Доля": "", "№ сегмента F": 1},
     ]
     st.subheader("Кол-во клиентов, сделавших n покупок (Frequency)")
     st.dataframe(frequency_data, use_container_width=True, hide_index=True)
