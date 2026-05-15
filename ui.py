@@ -891,18 +891,31 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     st.header("Когортный анализ")
 
     cohorts_df = data_loader.load_cohorts_from_db()
-    cohort_dict = {row["date_start"].strftime("%Y-%m-%d"): row["cohort"] for _, row in cohorts_df.iterrows()}
+    clients_df = data_loader.load_clients_from_db()
+
+    if not clients_df.empty and "first_order_date" in clients_df.columns:
+        clients_df = clients_df.copy()
+        clients_df["first_order_date_dt"] = pd.to_datetime(clients_df["first_order_date"], format="%Y-%m-%d", errors="coerce")
 
     st.subheader("Когорты клиентов")
-    cohort_table = [
-        {
-            "Дата перв. заказа - с": row["date_start"].strftime("%Y-%m-%d"),
-            "Номер когорты": row["cohort"],
-            "Кол-во клиентов": "",
+    cohort_table = []
+    for _, coh_row in cohorts_df.iterrows():
+        date_start = pd.to_datetime(coh_row["date_start"])
+        date_end = pd.to_datetime(coh_row["date_end"])
+
+        if not clients_df.empty and "first_order_date_dt" in clients_df.columns:
+            mask = (clients_df["first_order_date_dt"] >= date_start) & (clients_df["first_order_date_dt"] <= date_end)
+            client_count = int(clients_df[mask].shape[0])
+        else:
+            client_count = ""
+
+        cohort_table.append({
+            "Дата перв. заказа - с": date_start.strftime("%Y-%m-%d"),
+            "Номер когорты": coh_row["cohort"],
+            "Кол-во клиентов": client_count,
             "Сумма всех их покупок": ""
-        }
-        for _, row in cohorts_df.iterrows()
-    ]
+        })
+
     st.dataframe(cohort_table, use_container_width=True, hide_index=True)
 
 
