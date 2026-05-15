@@ -820,7 +820,7 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         headers = ["FR"] + [f"R-{r}" for r in r_values]
         rows_data = []
         for f in f_values:
-            row = [f"F-{f}"]
+            row = [f]
             for r in r_values:
                 count = clients_df[(clients_df["Frequency_Segment"] == f) & (clients_df["Recency_Segment"] == r)].shape[0]
                 row.append(count)
