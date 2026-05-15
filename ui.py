@@ -479,10 +479,10 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         st.rerun()
 
     recency_data = [
-        {"дата - с": (end_date - timedelta(days=r2_n - 1)).strftime("%Y-%m-%d"), "с": 0, "по": r2_n - 1, "№ сегмента R": 1},
-        {"дата - с": (end_date - timedelta(days=r3_n - 1)).strftime("%Y-%m-%d"), "с": r2_n, "по": r3_n - 1, "№ сегмента R": 2},
-        {"дата - с": (end_date - timedelta(days=r4_n - 1)).strftime("%Y-%m-%d"), "с": r3_n, "по": r4_n - 1, "№ сегмента R": 3},
-        {"дата - с": (end_date - timedelta(days=max_r)).strftime("%Y-%m-%d"), "с": r4_n, "по": max_r, "№ сегмента R": 4},
+        {"с": 0, "по": r2_n - 1, "№ сегмента R": 1},
+        {"с": r2_n, "по": r3_n - 1, "№ сегмента R": 2},
+        {"с": r3_n, "по": r4_n - 1, "№ сегмента R": 3},
+        {"с": r4_n, "по": max_r, "№ сегмента R": 4},
     ]
     st.subheader("Кол-во клиентов, сделавших последнюю покупку в период \"с - по\" дней назад (Recency)")
     st.dataframe(recency_data, use_container_width=True, hide_index=True)
