@@ -11,6 +11,7 @@ import analysis
 import cohorts
 import data_loader
 import plotting
+import psycopg2
 
 
 def render_sidebar(start_date: datetime, end_date: datetime) -> tuple:
@@ -512,6 +513,31 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
     ]
     st.subheader("Кол-во клиентов, сделавших последнюю покупку в период \"с - по\" дней назад (Recency)")
     st.dataframe(recency_data, use_container_width=True, hide_index=True)
+
+    # Assign Recency_Segment to clients
+    if clients_df is not None and not clients_df.empty:
+        recency_dates_sorted = sorted([(pd.to_datetime(row["дата - с"]), row["№ сегмента R"]) for row in recency_data], reverse=True)
+        def get_recency_segment(last_order):
+            for date_val, segment in recency_dates_sorted:
+                if last_order >= date_val:
+                    return segment
+            return recency_data[-1]["№ сегмента R"]
+        clients_df["Recency_Segment"] = clients_df["last_order_date"].apply(get_recency_segment)
+
+        # Save Recency_Segment to database
+        db_url = data_loader.get_database_url()
+        conn = psycopg2.connect(db_url)
+        cur = conn.cursor()
+        cur.execute("""
+            ALTER TABLE clients ADD COLUMN IF NOT EXISTS Recency_Segment INTEGER
+        """)
+        for _, row in clients_df.iterrows():
+            cur.execute("""
+                UPDATE clients SET Recency_Segment = %s WHERE client_id = %s
+            """, (int(row["Recency_Segment"]), int(row["client_id"])))
+        conn.commit()
+        cur.close()
+        conn.close()
 
     st.divider()
 
