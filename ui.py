@@ -890,15 +890,18 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     """Render Когортный анализ section."""
     st.header("Когортный анализ")
 
+    cohorts_df = data_loader.load_cohorts_from_db()
+    cohort_dict = {row["date_start"].strftime("%Y-%m-%d"): row["cohort"] for _, row in cohorts_df.iterrows()}
+
     st.subheader("Когорты клиентов")
     cohort_table = [
         {
             "Дата перв. заказа - с": d.strftime("%Y-%m-%d"),
-            "Номер когорты": i + 1,
+            "Номер когорты": cohort_dict.get(d.strftime("%Y-%m-%d"), ""),
             "Кол-во клиентов": "",
             "Сумма всех их покупок": ""
         }
-        for i, d in enumerate(cohort_dates)
+        for d in cohort_dates
     ]
     st.dataframe(cohort_table, use_container_width=True, hide_index=True)
 
