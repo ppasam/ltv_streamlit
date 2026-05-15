@@ -886,13 +886,19 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         """, unsafe_allow_html=True)
 
 
-def render_cohort_analysis() -> None:
+def render_cohort_analysis(cohort_dates: list) -> None:
     """Render Когортный анализ section."""
     st.header("Когортный анализ")
 
     st.subheader("Когорты клиентов")
     cohort_table = [
-        {"Дата перв. заказа - с": "", "Номер когорты": "", "Кол-во клиентов": "", "Сумма всех их покупок": ""},
+        {
+            "Дата перв. заказа - с": d.strftime("%Y-%m-%d"),
+            "Номер когорты": i + 1,
+            "Кол-во клиентов": "",
+            "Сумма всех их покупок": ""
+        }
+        for i, d in enumerate(cohort_dates)
     ]
     st.dataframe(cohort_table, use_container_width=True, hide_index=True)
 
@@ -912,4 +918,4 @@ def render_section(section: str, start_date: datetime, end_date: datetime, **kwa
     elif section == "RFM анализ":
         render_rfm_analysis(start_date, end_date)
     elif section == "Когортный анализ":
-        render_cohort_analysis()
+        render_cohort_analysis(kwargs.get("cohort_dates", []))
