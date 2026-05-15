@@ -869,6 +869,22 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         </div>
         """, unsafe_allow_html=True)
 
+        st.markdown("""
+        <div class="rf-marketing">
+        <b>Примеры маркетинговых активностей по сегментам</b>
+        <table>
+        <tr><th>RF сегмент</th><th>Маркетинговые активности</th></tr>
+        <tr><td style="background:#66BB6A; color:white;">Новички</td><td>Научить пользоваться</td></tr>
+        <tr><td style="background:#42A5F5; color:white;">Норма</td><td>Обычный режим промоактивности</td></tr>
+        <tr><td style="background:#FFD700; color:black;">VIP</td><td>Приглашение в клуб</td></tr>
+        <tr><td style="background:#FF8C00; color:white;">Уходящие VIP</td><td>Программы лояльности, Удержание, Реактивация</td></tr>
+        <tr><td style="background:#26A69A; color:white;">Одноразовые</td><td>Напоминание, Реактивация</td></tr>
+        <tr><td style="background:#FF7043; color:white;">Уходящие</td><td>Реактивация</td></tr>
+        <tr><td style="background:#999999; color:white;">Ушедшие</td><td>Прекратить промоактивность, пометить в базе ушедшими</td></tr>
+        </table>
+        </div>
+        """, unsafe_allow_html=True)
+
 
 def render_cohort_analysis() -> None:
     """Render Когортный анализ section."""
