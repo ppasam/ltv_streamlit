@@ -246,7 +246,11 @@ def create_cohort_revenue_chart(revenue_df: pd.DataFrame) -> go.Figure:
         for col in columns:
             val = revenue_df.loc[cohort, col]
             if isinstance(val, str):
-                val = float(val.replace("$", "").replace(",", ""))
+                val = val.strip()
+                if val == "" or val == "$":
+                    val = 0.0
+                else:
+                    val = float(val.replace("$", "").replace(",", ""))
             values.append(val)
 
         fig.add_trace(go.Scatter(
@@ -256,7 +260,7 @@ def create_cohort_revenue_chart(revenue_df: pd.DataFrame) -> go.Figure:
             name=cohort,
             line=dict(width=3, color=colors[i % len(colors)]),
             marker=dict(size=10, symbol="circle"),
-            text=[f"${v:,.0f}" for v in values],
+            text=[f"${v:,.0f}" if v > 0 else "" for v in values],
             textposition="top center",
             textfont=dict(size=10, color="#1a1a1a")
         ))
