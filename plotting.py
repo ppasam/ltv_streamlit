@@ -216,3 +216,71 @@ def create_profit_trend_chart(profit_df: pd.DataFrame) -> go.Figure:
     fig.update_yaxes(tickfont=dict(size=14, color="#1a1a1a"))
 
     return fig
+
+
+def create_cohort_revenue_chart(revenue_df: pd.DataFrame) -> go.Figure:
+    """Create line chart for cohort revenue dynamics."""
+    if revenue_df.empty:
+        return None
+
+    revenue_df = revenue_df.copy()
+
+    if "Когорты" in revenue_df.columns:
+        revenue_df = revenue_df.set_index("Когорты")
+
+    if "ВСЕГО" in revenue_df.columns:
+        revenue_df = revenue_df.drop(columns=["ВСЕГО"])
+
+    columns = [col for col in revenue_df.columns if col != "ВСЕГО"]
+    cohorts = list(revenue_df.index)
+
+    if not cohorts or not columns:
+        return None
+
+    fig = go.Figure()
+
+    colors = px.colors.qualitative.Set1 + px.colors.qualitative.Set2 + px.colors.qualitative.Dark24
+
+    for i, cohort in enumerate(cohorts):
+        values = []
+        for col in columns:
+            val = revenue_df.loc[cohort, col]
+            if isinstance(val, str):
+                val = float(val.replace("$", "").replace(",", ""))
+            values.append(val)
+
+        fig.add_trace(go.Scatter(
+            x=columns,
+            y=values,
+            mode="lines+markers+text" if len(columns) <= 10 else "lines+markers",
+            name=cohort,
+            line=dict(width=3, color=colors[i % len(colors)]),
+            marker=dict(size=10, symbol="circle"),
+            text=[f"${v:,.0f}" for v in values],
+            textposition="top center",
+            textfont=dict(size=10, color="#1a1a1a")
+        ))
+
+    fig.update_layout(
+        title=dict(text="Сумма выручки по когортам клиентов", font=dict(size=20, color="#1a1a1a", family="Arial Black")),
+        xaxis_title=dict(text="Период (когорта)", font=dict(size=16, color="#1a1a1a", family="Arial")),
+        yaxis_title=dict(text="Выручка", font=dict(size=16, color="#1a1a1a", family="Arial")),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.3,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=12, color="#1a1a1a")
+        ),
+        hovermode="x unified",
+        margin=dict(t=100, b=120, l=80, r=40),
+        plot_bgcolor="rgba(255,255,255,0.9)",
+        paper_bgcolor="white",
+        font=dict(size=14, color="#1a1a1a", family="Arial")
+    )
+
+    fig.update_xaxes(tickfont=dict(size=14, color="#1a1a1a"), tickangle=45)
+    fig.update_yaxes(tickfont=dict(size=14, color="#1a1a1a"))
+
+    return fig

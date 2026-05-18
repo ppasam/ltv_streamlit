@@ -951,7 +951,12 @@ def render_cohort_analysis(cohort_dates: list) -> None:
         row["ВСЕГО"] = f"${total_revenue:,.2f}" if total_revenue > 0 else ""
         revenue_table.append(row)
 
-    st.dataframe(revenue_table, use_container_width=True, hide_index=True)
+    revenue_table_df = pd.DataFrame(revenue_table)
+    st.dataframe(revenue_table_df, use_container_width=True, hide_index=True)
+
+    revenue_chart = plotting.create_cohort_revenue_chart(revenue_table_df)
+    if revenue_chart:
+        st.plotly_chart(revenue_chart, use_container_width=True)
 
 
 def render_section(section: str, start_date: datetime, end_date: datetime, **kwargs) -> None:
