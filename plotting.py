@@ -2,7 +2,6 @@
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.colors import convert_colors_to_rgba
 
 
 def create_profit_by_channel_pie_chart(profit_by_channel_df: pd.DataFrame) -> go.Figure:
@@ -219,6 +218,15 @@ def create_profit_trend_chart(profit_df: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def hex_to_rgba(hex_color: str, alpha: float) -> str:
+    """Convert hex color to rgba string."""
+    hex_color = hex_color.lstrip("#")
+    r = int(hex_color[0:2], 16)
+    g = int(hex_color[2:4], 16)
+    b = int(hex_color[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
+
 def create_cohort_revenue_chart(revenue_df: pd.DataFrame) -> go.Figure:
     """Create stacked area chart for cohort revenue dynamics."""
     if revenue_df.empty:
@@ -254,7 +262,8 @@ def create_cohort_revenue_chart(revenue_df: pd.DataFrame) -> go.Figure:
                     val = float(val.replace("$", "").replace(",", ""))
             values.append(val)
 
-        fillcolor = convert_colors_to_rgba(colors[i % len(colors)], 0.6)
+        color = colors[i % len(colors)]
+        fillcolor = hex_to_rgba(color, 0.6)
         fig.add_trace(go.Scatter(
             x=columns,
             y=values,
