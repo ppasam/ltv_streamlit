@@ -923,9 +923,9 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     st.subheader("Выручка по когортам")
     sales_df = data_loader.load_sales_from_db()
 
-    if not sales_df.empty and "purchase_date" in sales_df.columns:
+    if not sales_df.empty and "Date" in sales_df.columns:
         sales_df = sales_df.copy()
-        sales_df["purchase_date_dt"] = pd.to_datetime(sales_df["purchase_date"], format="%Y-%m-%d", errors="coerce")
+        sales_df["purchase_date_dt"] = pd.to_datetime(sales_df["Date"], errors="coerce")
 
     cohort_map = {coh_row["date_end"].strftime("%Y-%m-%d"): coh_row for _, coh_row in cohorts_df.iterrows()}
     column_headers = [coh_row["date_end"].strftime("%Y-%m-%d") for _, coh_row in cohorts_df.iterrows()]
@@ -939,9 +939,9 @@ def render_cohort_analysis(cohort_dates: list) -> None:
             date_start = pd.to_datetime(col_cohort["date_start"])
             date_end = pd.to_datetime(col_cohort["date_end"])
 
-            if not sales_df.empty and "purchase_date_dt" in sales_df.columns and "order_price" in sales_df.columns and "cohort" in sales_df.columns:
+            if not sales_df.empty and "purchase_date_dt" in sales_df.columns and "Revenue" in sales_df.columns and "cohort" in sales_df.columns:
                 mask = (sales_df["purchase_date_dt"] >= date_start) & (sales_df["purchase_date_dt"] <= date_end) & (sales_df["cohort"] == cohort_name)
-                revenue = float(sales_df.loc[mask, "order_price"].sum())
+                revenue = float(sales_df.loc[mask, "Revenue"].sum())
             else:
                 revenue = 0.0
 
