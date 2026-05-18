@@ -934,6 +934,7 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     revenue_table = []
     for cohort_name in cohort_names:
         row = {"Когорты": cohort_name}
+        total_revenue = 0.0
         for col in column_headers:
             col_cohort = cohort_map[col]
             date_start = pd.to_datetime(col_cohort["date_start"])
@@ -946,6 +947,8 @@ def render_cohort_analysis(cohort_dates: list) -> None:
                 revenue = 0.0
 
             row[col] = f"${revenue:,.2f}" if revenue > 0 else ""
+            total_revenue += revenue
+        row["ВСЕГО"] = f"${total_revenue:,.2f}" if total_revenue > 0 else ""
         revenue_table.append(row)
 
     st.dataframe(revenue_table, use_container_width=True, hide_index=True)
