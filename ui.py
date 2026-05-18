@@ -1048,6 +1048,23 @@ def render_cohort_analysis(cohort_dates: list) -> None:
                 avg_row[f"Период {period_idx + 1}"] = ""
         avg_revenue_table.append(avg_row)
 
+    weighted_row = {"Когорты": "Средневзвешенная"}
+    for period_idx in range(num_cohorts):
+        total_rev = 0.0
+        total_clients = 0
+        for row_idx in range(num_cohorts - period_idx):
+            col = column_headers[row_idx + period_idx]
+            rev_val = revenue_table[row_idx].get(col, "")
+            clients_val = active_clients_table[row_idx].get(col, "")
+            if rev_val != "" and clients_val != "" and clients_val != 0:
+                total_rev += float(str(rev_val).replace("$", "").replace(",", ""))
+                total_clients += clients_val
+        if total_clients > 0:
+            weighted_row[f"Период {period_idx + 1}"] = f"${total_rev / total_clients:,.2f}"
+        else:
+            weighted_row[f"Период {period_idx + 1}"] = ""
+    avg_revenue_table.append(weighted_row)
+
     avg_revenue_table_df = pd.DataFrame(avg_revenue_table)
     st.dataframe(avg_revenue_table_df, use_container_width=True, hide_index=True)
 
