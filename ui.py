@@ -1026,6 +1026,10 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     index_table_df = pd.DataFrame(index_table)
     st.dataframe(index_table_df, use_container_width=True, hide_index=True)
 
+    index_chart = plotting.create_client_index_chart(index_table_df)
+    if index_chart:
+        st.plotly_chart(index_chart, use_container_width=True)
+
 
 def render_section(section: str, start_date: datetime, end_date: datetime, **kwargs) -> None:
     """Render appropriate section based on selection."""
