@@ -984,6 +984,8 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     active_clients_table.append(total_row)
 
     active_clients_table_df = pd.DataFrame(active_clients_table)
+    st.dataframe(active_clients_table_df, use_container_width=True, hide_index=True)
+
     st.subheader("Количество активных клиентов (приведено к началу жизненного цикла)")
     num_cohorts = len(cohort_names)
     period_names = [f"Период {i+1}" for i in range(num_cohorts)]
