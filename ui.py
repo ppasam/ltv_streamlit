@@ -990,21 +990,12 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     first_col_values = [row[column_headers[0]] for row in active_clients_table if row.get("Когорты") != "ВСЕГО"]
     normalized_table = []
     for row_idx, first_val in enumerate(first_col_values):
-        row_header = first_val
-        row = {"Когорты": row_header}
-        for col in column_headers:
-            col_idx = column_headers.index(col)
-            col_cohort = cohort_map[col]
-            date_start = pd.to_datetime(col_cohort["date_start"])
-            date_end = pd.to_datetime(col_cohort["date_end"])
-
-            if not sales_df.empty and "purchase_date_dt" in sales_df.columns and "Customer ID" in sales_df.columns and "cohort" in sales_df.columns:
-                mask = (sales_df["purchase_date_dt"] >= date_start) & (sales_df["purchase_date_dt"] <= date_end) & (sales_df["cohort"] == cohort_names[row_idx])
-                active_count = int(sales_df.loc[mask, "Customer ID"].nunique())
+        row = {"Когорты": first_val}
+        for col_idx, col in enumerate(column_headers):
+            if col_idx >= row_idx:
+                row[col] = active_clients_table[row_idx][col]
             else:
-                active_count = 0
-
-            row[col] = active_count if active_count > 0 else ""
+                row[col] = ""
         normalized_table.append(row)
 
     normalized_table_df = pd.DataFrame(normalized_table)
