@@ -387,16 +387,17 @@ def create_avg_revenue_chart(avg_revenue_df: pd.DataFrame) -> go.Figure:
         avg_revenue_df = avg_revenue_df.drop(columns=["В среднем"])
 
     cohorts = list(avg_revenue_df.index)
+    regular_cohorts = [c for c in cohorts if c != "Средневзвешенная"]
     columns = list(avg_revenue_df.columns)
 
-    if not cohorts or not columns:
+    if not regular_cohorts and not columns:
         return None
 
     fig = go.Figure()
 
     colors = px.colors.qualitative.Set1 + px.colors.qualitative.Set2 + px.colors.qualitative.Dark24
 
-    for i, cohort in enumerate(cohorts):
+    for i, cohort in enumerate(regular_cohorts):
         values = []
         for col in columns:
             val = avg_revenue_df.loc[cohort, col]
