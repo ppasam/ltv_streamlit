@@ -958,6 +958,30 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     if revenue_chart:
         st.plotly_chart(revenue_chart, use_container_width=True)
 
+    st.subheader("Количество активных клиентов")
+    active_clients_table = []
+    for cohort_name in cohort_names:
+        row = {"Когорты": cohort_name}
+        total_clients = 0
+        for col in column_headers:
+            col_cohort = cohort_map[col]
+            date_start = pd.to_datetime(col_cohort["date_start"])
+            date_end = pd.to_datetime(col_cohort["date_end"])
+
+            if not sales_df.empty and "purchase_date_dt" in sales_df.columns and "Customer ID" in sales_df.columns and "cohort" in sales_df.columns:
+                mask = (sales_df["purchase_date_dt"] >= date_start) & (sales_df["purchase_date_dt"] <= date_end) & (sales_df["cohort"] == cohort_name)
+                active_count = int(sales_df.loc[mask, "Customer ID"].nunique())
+            else:
+                active_count = 0
+
+            row[col] = active_count if active_count > 0 else ""
+            total_clients += active_count
+        row["ВСЕГО"] = total_clients if total_clients > 0 else ""
+        active_clients_table.append(row)
+
+    active_clients_table_df = pd.DataFrame(active_clients_table)
+    st.dataframe(active_clients_table_df, use_container_width=True, hide_index=True)
+
 
 def render_section(section: str, start_date: datetime, end_date: datetime, **kwargs) -> None:
     """Render appropriate section based on selection."""
