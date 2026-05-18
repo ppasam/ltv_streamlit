@@ -152,11 +152,11 @@ def create_avg_profit_bar_chart(avg_profit_df: pd.DataFrame) -> go.Figure:
         margin=dict(t=100, b=80, l=80, r=40),
         plot_bgcolor="rgba(255,255,255,0.9)",
         paper_bgcolor="white",
-        font=dict(size=14, color="#1a1a1a", family="Arial")
+font=dict(size=14, color="#1a1a1a", family="Arial")
     )
-    
-    fig.update_xaxes(tickfont=dict(size=14, color="#1a1a1a"))
-    fig.update_yaxes(tickfont=dict(size=14, color="#1a1a1a"))
+
+    fig.update_xaxes(tickfont=dict(size=14, color="#1a1a1a"), tickangle=45)
+    fig.update_yaxes(tickfont=dict(size=14, color="#1a1a1a"), rangemode="tozero")
 
     return fig
 
@@ -385,6 +385,9 @@ def create_avg_revenue_chart(avg_revenue_df: pd.DataFrame) -> go.Figure:
 
     if "Средневзвешенная" in avg_revenue_df.index:
         avg_revenue_df = avg_revenue_df.drop(index=["Средневзвешенная"])
+
+    if "В среднем" in avg_revenue_df.columns:
+        avg_revenue_df = avg_revenue_df.drop(columns=["В среднем"])
 
     cohorts = list(avg_revenue_df.index)
     columns = list(avg_revenue_df.columns)
