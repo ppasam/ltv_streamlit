@@ -371,3 +371,74 @@ def create_client_index_chart(index_df: pd.DataFrame) -> go.Figure:
     fig.update_yaxes(tickfont=dict(size=14, color="#1a1a1a"), range=[0, 1.1])
 
     return fig
+
+
+def create_avg_revenue_chart(avg_revenue_df: pd.DataFrame) -> go.Figure:
+    """Create line chart for average revenue per customer."""
+    if avg_revenue_df.empty:
+        return None
+
+    avg_revenue_df = avg_revenue_df.copy()
+
+    if "Когорты" in avg_revenue_df.columns:
+        avg_revenue_df = avg_revenue_df.set_index("Когорты")
+
+    if "Средневзвешенная" in avg_revenue_df.index:
+        avg_revenue_df = avg_revenue_df.drop(index=["Средневзвешенная"])
+
+    cohorts = list(avg_revenue_df.index)
+    columns = list(avg_revenue_df.columns)
+
+    if not cohorts or not columns:
+        return None
+
+    fig = go.Figure()
+
+    colors = px.colors.qualitative.Set1 + px.colors.qualitative.Set2 + px.colors.qualitative.Dark24
+
+    for i, cohort in enumerate(cohorts):
+        values = []
+        for col in columns:
+            val = avg_revenue_df.loc[cohort, col]
+            if isinstance(val, str):
+                val = val.strip()
+                if val == "" or val == "$":
+                    values.append(None)
+                else:
+                    values.append(float(val.replace("$", "").replace(",", "")))
+            else:
+                values.append(float(val) if val else None)
+        values = [v if v is not None and v > 0 else None for v in values]
+
+        fig.add_trace(go.Scatter(
+            x=columns,
+            y=values,
+            name=cohort,
+            mode="lines+markers",
+            line=dict(width=2, color=colors[i % len(colors)]),
+            marker=dict(size=8, symbol="circle")
+        ))
+
+    fig.update_layout(
+        title=dict(text="Средняя выручка на покупателя (приведено к началу жизненного цикла)", font=dict(size=18, color="#1a1a1a", family="Arial Black")),
+        xaxis_title=dict(text="Период", font=dict(size=16, color="#1a1a1a", family="Arial")),
+        yaxis_title=dict(text="Выручка", font=dict(size=16, color="#1a1a1a", family="Arial")),
+        legend=dict(
+            orientation="v",
+            yanchor="top",
+            y=1,
+            xanchor="left",
+            x=1.02,
+            font=dict(size=12, color="#1a1a1a")
+        ),
+        hovermode="x unified",
+        margin=dict(t=100, b=80, l=80, r=200),
+        plot_bgcolor="rgba(255,255,255,0.9)",
+        paper_bgcolor="white",
+        font=dict(size=14, color="#1a1a1a", family="Arial")
+    )
+
+    fig.update_xaxes(tickfont=dict(size=14, color="#1a1a1a"), tickangle=45)
+    fig.update_yaxes(tickfont=dict(size=14, color="#1a1a1a"))
+
+    return fig

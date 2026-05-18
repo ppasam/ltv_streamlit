@@ -1100,6 +1100,10 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     avg_revenue_table_df = pd.DataFrame(avg_revenue_table)
     st.dataframe(avg_revenue_table_df, use_container_width=True, hide_index=True)
 
+    avg_revenue_chart = plotting.create_avg_revenue_chart(avg_revenue_table_df)
+    if avg_revenue_chart:
+        st.plotly_chart(avg_revenue_chart, use_container_width=True)
+
 
 def render_section(section: str, start_date: datetime, end_date: datetime, **kwargs) -> None:
     """Render appropriate section based on selection."""
