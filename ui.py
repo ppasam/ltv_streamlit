@@ -1111,7 +1111,7 @@ def render_cohort_analysis(cohort_dates: list) -> None:
 
     st.subheader("Количество ушедших клиентов")
     churn_table = []
-    rfm_vals_r = st.session_state.get("rfm_values_r", [30, 90, 180])
+    rfm_vals_r = st.session_state.get("rfm_values_r", [30, 90, 365])
     r4_n = rfm_vals_r[2]
 
     for row_idx, cohort_name in enumerate(cohort_names):
