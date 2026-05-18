@@ -1154,6 +1154,36 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     churn_table_df = pd.DataFrame(churn_table)
     st.dataframe(churn_table_df, use_container_width=True, hide_index=True)
 
+    st.subheader("Количество актуальных (оставшихся) клиентов")
+    churn_data = churn_table[:-1] if churn_table else []
+    actual_table = []
+    for row_idx, cohort_name in enumerate(cohort_names):
+        actual_row = {"Когорты": cohort_name}
+        prev_actual = cohort_table[row_idx]["Кол-во клиентов"] if row_idx < len(cohort_table) else 0
+        for i, col in enumerate(column_headers):
+            if i == row_idx:
+                actual_row[col] = prev_actual
+            elif i > row_idx:
+                churn_val = 0
+                if row_idx < len(churn_data) and col in churn_data[row_idx]:
+                    cv = churn_data[row_idx].get(col, 0)
+                    churn_val = cv if isinstance(cv, (int, float)) else 0
+                new_val = prev_actual - churn_val
+                actual_row[col] = new_val if new_val > 0 else ""
+                prev_actual = new_val if new_val > 0 else prev_actual
+            else:
+                actual_row[col] = ""
+        actual_table.append(actual_row)
+
+    total_row = {"Когорты": "ВСЕГО"}
+    for col in column_headers:
+        col_sum = sum(int(row[col]) for row in actual_table if isinstance(row[col], (int, float)) and row[col] != "")
+        total_row[col] = col_sum if col_sum > 0 else ""
+    actual_table.append(total_row)
+
+    actual_table_df = pd.DataFrame(actual_table)
+    st.dataframe(actual_table_df, use_container_width=True, hide_index=True)
+
 
 def render_section(section: str, start_date: datetime, end_date: datetime, **kwargs) -> None:
     """Render appropriate section based on selection."""
