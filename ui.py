@@ -920,6 +920,41 @@ def render_cohort_analysis(cohort_dates: list) -> None:
 
     st.dataframe(cohort_table, use_container_width=True, hide_index=True)
 
+    st.subheader("Выручка по когортам")
+    sales_df = data_loader.load_sales_from_db()
+
+    if not sales_df.empty and "purchase_date" in sales_df.columns:
+        sales_df = sales_df.copy()
+        sales_df["purchase_date_dt"] = pd.to_datetime(sales_df["purchase_date"], format="%Y-%m-%d", errors="coerce")
+
+    revenue_data = {}
+    for _, coh_row in cohorts_df.iterrows():
+        cohort_name = coh_row["cohort"]
+        date_start = pd.to_datetime(coh_row["date_start"])
+        date_end = pd.to_datetime(coh_row["date_end"])
+
+        if not sales_df.empty and "purchase_date_dt" in sales_df.columns and "order_price" in sales_df.columns:
+            mask = (sales_df["purchase_date_dt"] >= date_start) & (sales_df["purchase_date_dt"] <= date_end)
+            revenue = float(sales_df.loc[mask, "order_price"].sum())
+        else:
+            revenue = 0.0
+
+        date_key = date_end.strftime("%Y-%m-%d")
+        if cohort_name not in revenue_data:
+            revenue_data[cohort_name] = {}
+        revenue_data[cohort_name][date_key] = revenue
+
+    column_headers = [coh_row["date_end"].strftime("%Y-%m-%d") for _, coh_row in cohorts_df.iterrows()]
+    revenue_table = []
+    for cohort_name in revenue_data:
+        row = {"Когорты": cohort_name}
+        for col in column_headers:
+            val = revenue_data[cohort_name].get(col, 0.0)
+            row[col] = f"${val:,.2f}" if val > 0 else ""
+        revenue_table.append(row)
+
+    st.dataframe(revenue_table, use_container_width=True, hide_index=True)
+
 
 def render_section(section: str, start_date: datetime, end_date: datetime, **kwargs) -> None:
     """Render appropriate section based on selection."""
