@@ -1116,7 +1116,8 @@ def render_cohort_analysis(cohort_dates: list) -> None:
 
     for row_idx, cohort_name in enumerate(cohort_names):
         churn_row = {"Когорты": cohort_name}
-        for col in column_headers:
+        cumulative = 0
+        for col_idx, col in enumerate(column_headers):
             col_cohort = cohort_map[col]
             date_end = pd.to_datetime(col_cohort["date_end"])
 
@@ -1126,6 +1127,10 @@ def render_cohort_analysis(cohort_dates: list) -> None:
                 churn_count = int(clients_df[mask].shape[0])
             else:
                 churn_count = 0
+
+            if col_idx >= 1:
+                churn_count = max(0, churn_count - cumulative)
+                cumulative += churn_count if churn_count > 0 else 0
 
             churn_row[col] = churn_count if churn_count > 0 else ""
         churn_table.append(churn_row)
