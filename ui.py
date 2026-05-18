@@ -1048,6 +1048,22 @@ def render_cohort_analysis(cohort_dates: list) -> None:
                 avg_row[f"Период {period_idx + 1}"] = ""
         avg_revenue_table.append(avg_row)
 
+    for row_idx, row in enumerate(avg_revenue_table):
+        if row["Когорты"] != "Средневзвешенная":
+            total_rev_val = revenue_table[row_idx].get("ВСЕГО", "")
+            total_clients_sum = sum(
+                int(active_clients_table[row_idx].get(col, 0))
+                for col in column_headers
+                if active_clients_table[row_idx].get(col, "") != ""
+            )
+            if total_rev_val != "" and total_clients_sum > 0:
+                rev_num = float(str(total_rev_val).replace("$", "").replace(",", ""))
+                row["В среднем"] = f"${rev_num / total_clients_sum:,.2f}"
+            else:
+                row["В среднем"] = ""
+        else:
+            row["В среднем"] = ""
+
     weighted_row = {"Когорты": "Средневзвешенная"}
     for period_idx in range(num_cohorts):
         total_rev = 0.0
@@ -1063,6 +1079,20 @@ def render_cohort_analysis(cohort_dates: list) -> None:
             weighted_row[f"Период {period_idx + 1}"] = f"${total_rev / total_clients:,.2f}"
         else:
             weighted_row[f"Период {period_idx + 1}"] = ""
+    total_rev_all = 0.0
+    total_clients_all = 0
+    for row_idx in range(num_cohorts):
+        rev_val = revenue_table[row_idx].get("ВСЕГО", "")
+        if rev_val != "":
+            total_rev_all += float(str(rev_val).replace("$", "").replace(",", ""))
+        for col in column_headers:
+            clients_val = active_clients_table[row_idx].get(col, "")
+            if clients_val != "":
+                total_clients_all += int(clients_val)
+    if total_clients_all > 0:
+        weighted_row["В среднем"] = f"${total_rev_all / total_clients_all:,.2f}"
+    else:
+        weighted_row["В среднем"] = ""
     avg_revenue_table.append(weighted_row)
 
     avg_revenue_table_df = pd.DataFrame(avg_revenue_table)
