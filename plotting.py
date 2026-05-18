@@ -383,9 +383,6 @@ def create_avg_revenue_chart(avg_revenue_df: pd.DataFrame) -> go.Figure:
     if "Когорты" in avg_revenue_df.columns:
         avg_revenue_df = avg_revenue_df.set_index("Когорты")
 
-    if "Средневзвешенная" in avg_revenue_df.index:
-        avg_revenue_df = avg_revenue_df.drop(index=["Средневзвешенная"])
-
     if "В среднем" in avg_revenue_df.columns:
         avg_revenue_df = avg_revenue_df.drop(columns=["В среднем"])
 
@@ -420,6 +417,30 @@ def create_avg_revenue_chart(avg_revenue_df: pd.DataFrame) -> go.Figure:
             mode="lines+markers",
             line=dict(width=2, color=colors[i % len(colors)]),
             marker=dict(size=8, symbol="circle")
+        ))
+
+    if "Средневзвешенная" in avg_revenue_df.index:
+        weighted_row = avg_revenue_df.loc["Средневзвешенная"]
+        weighted_values = []
+        for col in columns:
+            val = weighted_row[col]
+            if isinstance(val, str):
+                val = val.strip()
+                if val == "" or val == "$":
+                    weighted_values.append(None)
+                else:
+                    weighted_values.append(float(val.replace("$", "").replace(",", "")))
+            else:
+                weighted_values.append(float(val) if val else None)
+        weighted_values = [v if v is not None and v > 0 else None for v in weighted_values]
+
+        fig.add_trace(go.Scatter(
+            x=columns,
+            y=weighted_values,
+            name="Средневзвешенная",
+            mode="lines+markers",
+            line=dict(width=3, color="black", dash="dash"),
+            marker=dict(size=10, symbol="square")
         ))
 
     fig.update_layout(
