@@ -986,6 +986,25 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     active_clients_table_df = pd.DataFrame(active_clients_table)
     st.dataframe(active_clients_table_df, use_container_width=True, hide_index=True)
 
+    st.subheader("Количество активных клиентов (приведено к началу жизненного цикла)")
+    num_cohorts = len(cohort_names)
+    normalized_table = []
+    for row_idx in range(num_cohorts):
+        cohort_name = cohort_names[row_idx]
+        row = {"Когорты": cohort_name}
+        for col_idx, col in enumerate(column_headers):
+            diag_idx = col_idx - row_idx
+            if diag_idx >= 0 and diag_idx < num_cohorts:
+                source_row = active_clients_table[diag_idx]
+                source_col = column_headers[row_idx]
+                row[col] = source_row.get(source_col, "")
+            else:
+                row[col] = ""
+        normalized_table.append(row)
+
+    normalized_table_df = pd.DataFrame(normalized_table)
+    st.dataframe(normalized_table_df, use_container_width=True, hide_index=True)
+
 
 def render_section(section: str, start_date: datetime, end_date: datetime, **kwargs) -> None:
     """Render appropriate section based on selection."""
