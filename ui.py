@@ -1130,6 +1130,27 @@ def render_cohort_analysis(cohort_dates: list) -> None:
             churn_row[col] = churn_count if churn_count > 0 else ""
         churn_table.append(churn_row)
 
+    for row in churn_table:
+        prev_val = ""
+        for i in range(len(column_headers)):
+            if i >= 2:
+                curr_val = row[column_headers[i]]
+                if curr_val != "" and prev_val != "":
+                    diff = curr_val - prev_val
+                    row[column_headers[i]] = diff if diff > 0 else ""
+                prev_val = curr_val if curr_val != "" else prev_val
+
+    for row in churn_table:
+        total = sum(v for v in row.values() if isinstance(v, (int, float)) and v != "")
+        row["ВСЕГО"] = total if total > 0 else ""
+
+    total_row = {"Когорты": "ВСЕГО"}
+    for col in column_headers:
+        col_sum = sum(int(row[col]) for row in churn_table if isinstance(row[col], (int, float)) and row[col] != "")
+        total_row[col] = col_sum if col_sum > 0 else ""
+    total_row["ВСЕГО"] = sum(int(row["ВСЕГО"]) for row in churn_table if isinstance(row["ВСЕГО"], (int, float)) and row["ВСЕГО"] != "")
+    churn_table.append(total_row)
+
     churn_table_df = pd.DataFrame(churn_table)
     st.dataframe(churn_table_df, use_container_width=True, hide_index=True)
 
