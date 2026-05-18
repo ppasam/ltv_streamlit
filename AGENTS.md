@@ -29,6 +29,16 @@ Access Streamlit at http://localhost:8501
 - `data/promotion_costs_template.xlsx` - Promotion costs
 - `data/other_marketing_costs_template.xlsx` - Other marketing costs
 
+## PostgreSQL Tables
+
+`clients`, `cohorts`, `other_marketing_costs`, `promotion_costs`, `sales`
+
+### clients table columns
+
+`client_id`, `num_orders`, `first_order_date`, `last_order_date`, `total_amount`, `first_order_id`, `first_order_channel`, `cohort`, `Recency_Segment`, `Frequency_Segment`, `Monetary_Segment`
+
+Note: `last_order_date` and `first_order_date` stored as `text` in DB, parse with `format="%Y-%m-%d"` in pandas.
+
 ## RFM Analysis - Session State Keys
 
 Each R/F/M section has its own independent session state keys to avoid collisions:
@@ -52,10 +62,13 @@ m2_d = Decimal(str(m2_raw)).quantize(COUNTER_STEP, rounding=ROUND_HALF_UP)
 
 ## Monetary - Min/Float Trick
 
-Streamlit's button deactivation uses `<=` (not `<`). To allow minus button when value is 0.03, min must be below the value. Use per-segment float mins slightly below Decimal min:
+Streamlit's button deactivation uses `<=` (not `<`). To allow minus button when value is 0.03, min must be below the value. Use per-segment float mins slightly below Decimal min. Also handle edge case when max < min:
 
 ```python
-min_float_m2 = float(Decimal("0.019"))  # allows minus when value=0.02
+min_float_m2 = float(Decimal("0.019"))
+max_float_m2 = max(min_float_m2, float(max_monetary - Decimal("0.02")))
+if max_float_m2 < min_float_m2:
+    max_float_m2 = min_float_m2
 ```
 
 ## Monetary - Propagation Logic
@@ -92,19 +105,24 @@ Count clients where `last_order_date` is in range `[date_from, date_to]`. Exampl
 - `date_from = 2014-12-31 - 29 = 2014-12-02`
 - `date_to = 2014-12-31 - 0 = 2014-12-31`
 
-## Recency - "Доля" Calculation
+## Frequency - Segment Assignment
 
-`Доля` = `Кол-во клиентов` / total clients. (Not yet implemented)
+For each client, `Frequency_Segment` = first `№ сегмента F` where `num_orders <= max_n` (sorted ascending by max_n).
 
-## PostgreSQL Tables
+## Monetary - Segment Assignment
 
-`clients`, `cohorts`, `other_marketing_costs`, `promotion_costs`, `sales`
+For each client, `Monetary_Segment` = first `№ сегмента M` where `total_amount <= по` (sorted ascending by по).
 
-### clients table columns
+## RF Matrix
 
-`client_id`, `num_orders`, `first_order_date`, `last_order_date`, `total_amount`, `first_order_id`, `first_order_channel`, `cohort`
-
-Note: `last_order_date` stored as `text` in DB, parse with `format="%Y-%m-%d"` in pandas.
+Located after Monetary table. Uses HTML tables with inline CSS for coloring. Color scheme:
+- Ушедшие: `#999999` (gray)
+- Уходящие VIP: `#FF8C00` (orange)
+- VIP: `#FFD700` (gold)
+- Уходящие: `#FF7043` (coral)
+- Норма: `#42A5F5` (blue)
+- Одноразовые: `#26A69A` (teal)
+- Новички: `#66BB6A` (green)
 
 ## Streamlit Tables - Include All Columns Explicitly
 
@@ -131,4 +149,36 @@ This forces Streamlit to re-render with updated constraints.
 
 ## Git Workflow
 
-Commits are pushed directly to main. Tags used for releases (e.g., `v0.0.30`).
+Commits are pushed directly to main. Tags used for releases (e.g., `v0.1.0`).
+
+## Когортный анализ Tables
+
+### "Когорты клиентов" table
+- Source: `cohorts` and `clients` tables from DB
+- Columns from `cohorts`: `date_start` → "Дата перв. заказа - с", `cohort` → "Номер когорты"
+- "Кол-во клиентов": count clients where `date_end >= first_order_date >= date_start`
+- "Сумма всех их покупок": sum `total_amount` where same condition, formatted as `$X,XXX.XX`
+
+### "Выручка по когортам" table
+- Source: `cohorts` and `sales` tables from DB
+- Rows: cohort names from `cohorts.cohort`
+- Columns: `date_end` values from `cohorts`
+- Cell values: sum `order_price` from `sales` where `date_end >= purchase_date >= date_start` AND `sales.cohort = row_cohort`
+- "ВСЕГО" column: sum of all column values per row
+
+### Stacked Area Chart (plotting.py)
+- Function: `create_cohort_revenue_chart(revenue_df)`
+- Uses `stackgroup="cohort_revenue"` for stacked area
+- Colors from `px.colors.qualitative.Set1/Set2/Dark24`
+- Use `hex_to_rgba()` helper (defined in plotting.py) to convert colors to rgba with alpha=0.6
+- Legend positioned on the right side
+
+## PostgreSQL Tables Detail
+
+### cohorts
+`cohort`, `date_start`, `date_end`
+
+### sales
+`purchase_date`, `order_id`, `order_price`, `cost`, `client_id`, `acquisition_channel`, `cohort`
+
+Note: `load_sales_from_db()` renames columns: `purchase_date` → `Date`, `order_price` → `Revenue`
