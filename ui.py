@@ -927,6 +927,11 @@ def render_cohort_analysis(cohort_dates: list) -> None:
         sales_df = sales_df.copy()
         sales_df["purchase_date_dt"] = pd.to_datetime(sales_df["Date"], errors="coerce")
 
+    clients_df = data_loader.load_clients_from_db()
+    if not clients_df.empty and "last_order_date" in clients_df.columns:
+        clients_df = clients_df.copy()
+        clients_df["last_order_date_dt"] = pd.to_datetime(clients_df["last_order_date"], format="%Y-%m-%d", errors="coerce")
+
     cohort_map = {coh_row["date_end"].strftime("%Y-%m-%d"): coh_row for _, coh_row in cohorts_df.iterrows()}
     column_headers = [coh_row["date_end"].strftime("%Y-%m-%d") for _, coh_row in cohorts_df.iterrows()]
     cohort_names = [coh_row["cohort"] for _, coh_row in cohorts_df.iterrows()]
@@ -1103,6 +1108,30 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     avg_revenue_chart = plotting.create_avg_revenue_chart(avg_revenue_table_df)
     if avg_revenue_chart:
         st.plotly_chart(avg_revenue_chart, use_container_width=True)
+
+    st.subheader("Количество ушедших клиентов")
+    churn_table = []
+    rfm_vals_r = st.session_state.get("rfm_values_r", [30, 90, 180])
+    r4_n = rfm_vals_r[2]
+
+    for row_idx, cohort_name in enumerate(cohort_names):
+        churn_row = {"Когорты": cohort_name}
+        for col in column_headers:
+            col_cohort = cohort_map[col]
+            date_end = pd.to_datetime(col_cohort["date_end"])
+
+            if not clients_df.empty and "last_order_date_dt" in clients_df.columns and "cohort" in clients_df.columns:
+                threshold_date = date_end - timedelta(days=r4_n)
+                mask = (clients_df["cohort"] == cohort_name) & (clients_df["last_order_date_dt"] <= threshold_date)
+                churn_count = int(clients_df[mask].shape[0])
+            else:
+                churn_count = 0
+
+            churn_row[col] = churn_count if churn_count > 0 else ""
+        churn_table.append(churn_row)
+
+    churn_table_df = pd.DataFrame(churn_table)
+    st.dataframe(churn_table_df, use_container_width=True, hide_index=True)
 
 
 def render_section(section: str, start_date: datetime, end_date: datetime, **kwargs) -> None:
