@@ -984,34 +984,6 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     active_clients_table.append(total_row)
 
     active_clients_table_df = pd.DataFrame(active_clients_table)
-    st.subheader("Средняя выручка на покупателя")
-    avg_revenue_table = []
-    for row_idx, cohort_name in enumerate(cohort_names):
-        revenue_row = revenue_table[row_idx]
-        clients_row = active_clients_table[row_idx]
-        avg_row = {"Когорты": cohort_name}
-        total_revenue = 0.0
-        total_clients = 0
-        for col in column_headers:
-            rev_val = revenue_row.get(col, "")
-            clients_val = clients_row.get(col, "")
-            if rev_val != "" and clients_val != "" and clients_val != 0:
-                rev_num = float(str(rev_val).replace("$", "").replace(",", ""))
-                avg_val = rev_num / clients_val
-                avg_row[col] = f"${avg_val:,.2f}"
-                total_revenue += rev_num
-                total_clients += clients_val
-            else:
-                avg_row[col] = ""
-        if total_clients > 0:
-            avg_row["ВСЕГО"] = f"${total_revenue / total_clients:,.2f}"
-        else:
-            avg_row["ВСЕГО"] = ""
-        avg_revenue_table.append(avg_row)
-
-    avg_revenue_table_df = pd.DataFrame(avg_revenue_table)
-    st.dataframe(avg_revenue_table_df, use_container_width=True, hide_index=True)
-
     st.subheader("Количество активных клиентов (приведено к началу жизненного цикла)")
     num_cohorts = len(cohort_names)
     period_names = [f"Период {i+1}" for i in range(num_cohorts)]
@@ -1055,6 +1027,34 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     index_chart = plotting.create_client_index_chart(index_table_df)
     if index_chart:
         st.plotly_chart(index_chart, use_container_width=True)
+
+    st.subheader("Средняя выручка на покупателя")
+    avg_revenue_table = []
+    for row_idx, cohort_name in enumerate(cohort_names):
+        revenue_row = revenue_table[row_idx]
+        clients_row = active_clients_table[row_idx]
+        avg_row = {"Когорты": cohort_name}
+        total_revenue = 0.0
+        total_clients = 0
+        for col in column_headers:
+            rev_val = revenue_row.get(col, "")
+            clients_val = clients_row.get(col, "")
+            if rev_val != "" and clients_val != "" and clients_val != 0:
+                rev_num = float(str(rev_val).replace("$", "").replace(",", ""))
+                avg_val = rev_num / clients_val
+                avg_row[col] = f"${avg_val:,.2f}"
+                total_revenue += rev_num
+                total_clients += clients_val
+            else:
+                avg_row[col] = ""
+        if total_clients > 0:
+            avg_row["ВСЕГО"] = f"${total_revenue / total_clients:,.2f}"
+        else:
+            avg_row["ВСЕГО"] = ""
+        avg_revenue_table.append(avg_row)
+
+    avg_revenue_table_df = pd.DataFrame(avg_revenue_table)
+    st.dataframe(avg_revenue_table_df, use_container_width=True, hide_index=True)
 
 
 def render_section(section: str, start_date: datetime, end_date: datetime, **kwargs) -> None:
