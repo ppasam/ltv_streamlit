@@ -1,4 +1,5 @@
 """Plotting module for LTV analysis visualizations."""
+import re
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -207,6 +208,96 @@ def create_profit_trend_chart(profit_df: pd.DataFrame) -> go.Figure:
         ),
         hovermode="x unified",
         margin=dict(t=100, b=100, l=80, r=180),
+        plot_bgcolor="rgba(255,255,255,0.9)",
+        paper_bgcolor="white",
+        font=dict(size=14, color="#1a1a1a", family="Arial")
+    )
+
+    fig.update_xaxes(tickfont=dict(size=14, color="#1a1a1a"), tickangle=45)
+    fig.update_yaxes(tickfont=dict(size=14, color="#1a1a1a"))
+
+    return fig
+
+
+def hex_to_rgba(hex_color: str, alpha: float) -> str:
+    """Convert hex or rgb color to rgba string."""
+    hex_color = hex_color.strip()
+    if hex_color.startswith("rgb"):
+        rgb_match = re.search(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", hex_color)
+        if rgb_match:
+            r, g, b = int(rgb_match.group(1)), int(rgb_match.group(2)), int(rgb_match.group(3))
+        else:
+            return f"rgba(128,128,128,{alpha})"
+    elif hex_color.startswith("#") and len(hex_color) == 7:
+        r = int(hex_color[1:3], 16)
+        g = int(hex_color[3:5], 16)
+        b = int(hex_color[5:7], 16)
+    else:
+        return f"rgba(128,128,128,{alpha})"
+    return f"rgba({r},{g},{b},{alpha})"
+
+
+def create_cohort_revenue_chart(revenue_df: pd.DataFrame) -> go.Figure:
+    """Create stacked area chart for cohort revenue dynamics."""
+    if revenue_df.empty:
+        return None
+
+    revenue_df = revenue_df.copy()
+
+    if "Когорты" in revenue_df.columns:
+        revenue_df = revenue_df.set_index("Когорты")
+
+    if "ВСЕГО" in revenue_df.columns:
+        revenue_df = revenue_df.drop(columns=["ВСЕГО"])
+
+    columns = [col for col in revenue_df.columns if col != "ВСЕГО"]
+    cohorts = list(revenue_df.index)
+
+    if not cohorts or not columns:
+        return None
+
+    fig = go.Figure()
+
+    colors = px.colors.qualitative.Set1 + px.colors.qualitative.Set2 + px.colors.qualitative.Dark24
+
+    for i, cohort in enumerate(cohorts):
+        values = []
+        for col in columns:
+            val = revenue_df.loc[cohort, col]
+            if isinstance(val, str):
+                val = val.strip()
+                if val == "" or val == "$":
+                    val = 0.0
+                else:
+                    val = float(val.replace("$", "").replace(",", ""))
+            values.append(val)
+
+        color = colors[i % len(colors)]
+        fillcolor = hex_to_rgba(color, 0.6)
+        fig.add_trace(go.Scatter(
+            x=columns,
+            y=values,
+            name=cohort,
+            stackgroup="cohort_revenue",
+            fillcolor=fillcolor,
+            line=dict(width=2, color=colors[i % len(colors)]),
+            mode="lines"
+        ))
+
+    fig.update_layout(
+        title=dict(text="Сумма выручки по когортам клиентов", font=dict(size=20, color="#1a1a1a", family="Arial Black")),
+        xaxis_title=dict(text="Период (когорта)", font=dict(size=16, color="#1a1a1a", family="Arial")),
+        yaxis_title=dict(text="Выручка", font=dict(size=16, color="#1a1a1a", family="Arial")),
+        legend=dict(
+            orientation="v",
+            yanchor="top",
+            y=1,
+            xanchor="left",
+            x=1.02,
+            font=dict(size=12, color="#1a1a1a")
+        ),
+        hovermode="x unified",
+        margin=dict(t=100, b=80, l=80, r=180),
         plot_bgcolor="rgba(255,255,255,0.9)",
         paper_bgcolor="white",
         font=dict(size=14, color="#1a1a1a", family="Arial")
