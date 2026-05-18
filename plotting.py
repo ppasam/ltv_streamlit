@@ -219,7 +219,7 @@ def create_profit_trend_chart(profit_df: pd.DataFrame) -> go.Figure:
 
 
 def create_cohort_revenue_chart(revenue_df: pd.DataFrame) -> go.Figure:
-    """Create line chart for cohort revenue dynamics."""
+    """Create stacked area chart for cohort revenue dynamics."""
     if revenue_df.empty:
         return None
 
@@ -256,13 +256,11 @@ def create_cohort_revenue_chart(revenue_df: pd.DataFrame) -> go.Figure:
         fig.add_trace(go.Scatter(
             x=columns,
             y=values,
-            mode="lines",
             name=cohort,
-            fill="tonexty",
+            stackgroup="cohort_revenue",
+            fillcolor=f"rgba{tuple(list(colors[i % len(colors)]) + [0.6])}",
             line=dict(width=2, color=colors[i % len(colors)]),
-            text=[f"${v:,.0f}" if v > 0 else "" for v in values],
-            textposition="top center",
-            textfont=dict(size=10, color="#1a1a1a")
+            mode="lines"
         ))
 
     fig.update_layout(
