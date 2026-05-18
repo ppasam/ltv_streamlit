@@ -960,9 +960,9 @@ def render_cohort_analysis(cohort_dates: list) -> None:
 
     st.subheader("Количество активных клиентов")
     active_clients_table = []
+    column_totals = {col: 0 for col in column_headers}
     for cohort_name in cohort_names:
         row = {"Когорты": cohort_name}
-        total_clients = 0
         for col in column_headers:
             col_cohort = cohort_map[col]
             date_start = pd.to_datetime(col_cohort["date_start"])
@@ -975,9 +975,13 @@ def render_cohort_analysis(cohort_dates: list) -> None:
                 active_count = 0
 
             row[col] = active_count if active_count > 0 else ""
-            total_clients += active_count
-        row["ВСЕГО"] = total_clients if total_clients > 0 else ""
+            column_totals[col] += active_count
         active_clients_table.append(row)
+
+    total_row = {"Когорты": "ВСЕГО"}
+    for col in column_headers:
+        total_row[col] = column_totals[col] if column_totals[col] > 0 else ""
+    active_clients_table.append(total_row)
 
     active_clients_table_df = pd.DataFrame(active_clients_table)
     st.dataframe(active_clients_table_df, use_container_width=True, hide_index=True)
