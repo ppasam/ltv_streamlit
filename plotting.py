@@ -1,4 +1,5 @@
 """Plotting module for LTV analysis visualizations."""
+import re
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -219,11 +220,20 @@ def create_profit_trend_chart(profit_df: pd.DataFrame) -> go.Figure:
 
 
 def hex_to_rgba(hex_color: str, alpha: float) -> str:
-    """Convert hex color to rgba string."""
-    hex_color = hex_color.lstrip("#")
-    r = int(hex_color[0:2], 16)
-    g = int(hex_color[2:4], 16)
-    b = int(hex_color[4:6], 16)
+    """Convert hex or rgb color to rgba string."""
+    hex_color = hex_color.strip()
+    if hex_color.startswith("rgb"):
+        rgb_match = re.search(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", hex_color)
+        if rgb_match:
+            r, g, b = int(rgb_match.group(1)), int(rgb_match.group(2)), int(rgb_match.group(3))
+        else:
+            return f"rgba(128,128,128,{alpha})"
+    elif hex_color.startswith("#") and len(hex_color) == 7:
+        r = int(hex_color[1:3], 16)
+        g = int(hex_color[3:5], 16)
+        b = int(hex_color[5:7], 16)
+    else:
+        return f"rgba(128,128,128,{alpha})"
     return f"rgba({r},{g},{b},{alpha})"
 
 
