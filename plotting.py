@@ -256,10 +256,10 @@ def create_cohort_revenue_chart(revenue_df: pd.DataFrame) -> go.Figure:
         fig.add_trace(go.Scatter(
             x=columns,
             y=values,
-            mode="lines+markers+text" if len(columns) <= 10 else "lines+markers",
+            mode="lines",
             name=cohort,
-            line=dict(width=3, color=colors[i % len(colors)]),
-            marker=dict(size=10, symbol="circle"),
+            fill="tonexty",
+            line=dict(width=2, color=colors[i % len(colors)]),
             text=[f"${v:,.0f}" if v > 0 else "" for v in values],
             textposition="top center",
             textfont=dict(size=10, color="#1a1a1a")
@@ -270,15 +270,15 @@ def create_cohort_revenue_chart(revenue_df: pd.DataFrame) -> go.Figure:
         xaxis_title=dict(text="Период (когорта)", font=dict(size=16, color="#1a1a1a", family="Arial")),
         yaxis_title=dict(text="Выручка", font=dict(size=16, color="#1a1a1a", family="Arial")),
         legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=-0.3,
-            xanchor="center",
-            x=0.5,
+            orientation="v",
+            yanchor="top",
+            y=1,
+            xanchor="left",
+            x=1.02,
             font=dict(size=12, color="#1a1a1a")
         ),
         hovermode="x unified",
-        margin=dict(t=100, b=120, l=80, r=40),
+        margin=dict(t=100, b=80, l=80, r=180),
         plot_bgcolor="rgba(255,255,255,0.9)",
         paper_bgcolor="white",
         font=dict(size=14, color="#1a1a1a", family="Arial")
