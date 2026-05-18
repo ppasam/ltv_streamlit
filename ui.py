@@ -991,11 +991,12 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     normalized_table = []
     for row_idx, first_val in enumerate(first_col_values):
         row = {"Когорты": first_val}
+        shifted_values = active_clients_table[row_idx].copy()
+        del shifted_values["Когорты"]
+        shifted_values_list = list(shifted_values.values())
+        padded = [""] * row_idx + shifted_values_list[row_idx:]
         for col_idx, col in enumerate(column_headers):
-            if col_idx >= row_idx:
-                row[col] = active_clients_table[row_idx][col]
-            else:
-                row[col] = ""
+            row[col] = padded[col_idx] if col_idx < len(padded) else ""
         normalized_table.append(row)
 
     normalized_table_df = pd.DataFrame(normalized_table)
