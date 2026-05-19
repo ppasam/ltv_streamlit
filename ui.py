@@ -1185,9 +1185,15 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     st.dataframe(actual_table_df, use_container_width=True, hide_index=True)
 
     st.subheader("Churn rate")
-    churn_rate_df = pd.DataFrame(actual_table)
-    new_columns = ["Когорты"] + [f"Период {i+1}" for i in range(len(column_headers))]
-    churn_rate_df.columns = new_columns
+    new_columns = ["Когорты"] + [f"Период {i+1}" for i in range(len(column_headers))] + ["В среднем за все время"]
+    churn_rate_data = []
+    for row in actual_table:
+        new_row = {"Когорты": row["Когорты"]}
+        for i, col_name in enumerate(new_columns[1:-1]):
+            new_row[col_name] = ""
+        new_row["В среднем за все время"] = ""
+        churn_rate_data.append(new_row)
+    churn_rate_df = pd.DataFrame(churn_rate_data)
     churn_rate_df = churn_rate_df.astype(object)
     churn_rate_df.iloc[:, 0] = churn_rate_df.iloc[:, 0].astype(str)
 
@@ -1209,6 +1215,15 @@ def render_cohort_analysis(cohort_dates: list) -> None:
             else:
                 churn_rate_df.iloc[row_idx, col_idx] = ""
 
+    num_cohorts = len(column_headers)
+    for row_idx in range(len(actual_table) - 1):
+        k = row_idx + 1
+        x = actual_table[row_idx].get(column_headers[-1], 0)
+        y = cohort_table[row_idx]["Кол-во клиентов"] if row_idx < len(cohort_table) else 0
+        if isinstance(x, (int, float)) and isinstance(y, (int, float)) and y > 0 and k < num_cohorts:
+            churn = 1 - (x / y) ** (1 / (num_cohorts - k))
+            churn_rate_df.iloc[row_idx, -1] = f"{churn * 100:.2f}%"
+
     if "ВСЕГО" in churn_rate_df["Когорты"].values:
         for col in churn_rate_df.columns[1:]:
             churn_rate_df.loc[churn_rate_df["Когорты"] == "ВСЕГО", col] = ""
@@ -1220,6 +1235,18 @@ def render_cohort_analysis(cohort_dates: list) -> None:
             if prev_diag_sum > 0:
                 churn = 1 - (curr_diag_sum / prev_diag_sum)
                 churn_rate_df.loc[churn_rate_df["Когорты"] == "ВСЕГО", new_columns[period_idx]] = f"{churn * 100:.2f}%"
+
+        values = []
+        for row_idx in range(len(actual_table) - 1):
+            val = churn_rate_df.iloc[row_idx, -1]
+            if val != "" and isinstance(val, str):
+                try:
+                    values.append(float(val.replace("%", "")))
+                except:
+                    pass
+        if values:
+            avg = sum(values) / len(values)
+            churn_rate_df.loc[churn_rate_df["Когорты"] == "ВСЕГО", "В среднем за все время"] = f"{avg:.2f}%"
 
         churn_rate_df.loc[churn_rate_df["Когорты"] == "ВСЕГО", "Когорты"] = "В среднем"
 
