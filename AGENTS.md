@@ -39,8 +39,9 @@ Simply refreshing the browser will NOT show changes. The container must be rebui
 
 ## Versions
 
-- v0.1.1 - Current (Cohort analysis tables and stacked area chart)
-- Previous: v0.0.25 (RFM with Frequency table)
+- v0.2.0 - CLV table with cohort selector and CAC:CLV ratio input
+- v0.1.11 - Add CLV calculation table with CAC:CLV ratio
+- v0.1.1 - Cohort analysis tables and stacked area chart
 
 ## PostgreSQL Tables
 
@@ -207,3 +208,18 @@ Commits are pushed directly to main. Tags used for releases (e.g., `v0.1.0`).
 `purchase_date`, `order_id`, `order_price`, `cost`, `client_id`, `acquisition_channel`, `cohort`
 
 Note: `load_sales_from_db()` renames columns: `purchase_date` → `Date`, `order_price` → `Revenue`, `client_id` → `Customer ID`
+
+## CLV Calculation Table
+
+- Located in `render_cohort_analysis()` in ui.py
+- Cohort selector: `st.number_input("Выберите номер когорты для расчета CLV", ...)` with key `clv_cohort_number`
+- Row 1: "Ср. прибыль с клиента за период (по выбранной когорте)" — from `gp_per_client_table[cohort_number-1]["ВСЕГО"]`
+- Row 2: "Churn rate (по выбранной когорте)" — from `churn_rate_df.iloc[cohort_number-1]["В среднем за все время"]`
+- Row 3: "Средняя длительность Lifetime (периодов)" = 1 / churn_rate_val
+- Row 4: "CLV" = row1 / churn_rate_val formatted as `$X,XXX.XX`
+
+## CAC:CLV Ratio
+
+- Two `st.number_input` widgets with keys `cac_clv_ratio_num` (default 1) and `cac_clv_ratio_denom` (default 3)
+- Calculated: `acceptable_cac = clv_val * cac_ratio / clv_ratio` formatted as `$X,XXX.XX`
+- Recalculates on every page render (including widget changes)
