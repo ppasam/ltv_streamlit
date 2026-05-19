@@ -1175,6 +1175,8 @@ def render_cohort_analysis(cohort_dates: list) -> None:
                 actual_row[col] = ""
         actual_table.append(actual_row)
 
+    actual_table_data = actual_table
+
     total_row = {"Когорты": "ВСЕГО"}
     for col in column_headers:
         col_sum = sum(int(row[col]) for row in actual_table if isinstance(row[col], (int, float)) and row[col] != "")
@@ -1285,6 +1287,34 @@ def render_cohort_analysis(cohort_dates: list) -> None:
 
     gross_profit_df = pd.DataFrame(gross_profit_table)
     st.dataframe(gross_profit_df, use_container_width=True, hide_index=True)
+
+    st.subheader("Валовая прибыль на одного клиента")
+    gp_per_client_table = []
+    for row_idx in range(len(gross_profit_table)):
+        row = gross_profit_table[row_idx]
+        gp_row = {"Когорты": row["Когорты"]}
+        for col in column_headers:
+            gp_val = row.get(col, "")
+            actual_val = actual_table_data[row_idx].get(col, 0)
+            if isinstance(gp_val, str) and gp_val and isinstance(actual_val, (int, float)) and actual_val > 0:
+                gp_num = float(gp_val.replace("$", "").replace(",", ""))
+                per_client = gp_num / actual_val
+                gp_row[col] = f"${per_client:,.2f}" if per_client > 0 else ""
+            else:
+                gp_row[col] = ""
+        gp_total_str = row.get("ВСЕГО", "")
+        if isinstance(gp_total_str, str) and gp_total_str:
+            gp_total_num = float(gp_total_str.replace("$", "").replace(",", ""))
+            actual_sum = sum(actual_table_data[row_idx].get(c, 0) for c in column_headers if isinstance(actual_table_data[row_idx].get(c, 0), (int, float)) and actual_table_data[row_idx].get(c, 0) > 0)
+            if actual_sum > 0:
+                gp_row["ВСЕГО"] = f"${gp_total_num / actual_sum:,.2f}"
+            else:
+                gp_row["ВСЕГО"] = ""
+        else:
+            gp_row["ВСЕГО"] = ""
+        gp_per_client_table.append(gp_row)
+    gp_per_client_df = pd.DataFrame(gp_per_client_table)
+    st.dataframe(gp_per_client_df, use_container_width=True, hide_index=True)
 
 
 def render_section(section: str, start_date: datetime, end_date: datetime, **kwargs) -> None:
