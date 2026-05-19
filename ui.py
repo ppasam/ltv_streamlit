@@ -1184,6 +1184,35 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     actual_table_df = pd.DataFrame(actual_table)
     st.dataframe(actual_table_df, use_container_width=True, hide_index=True)
 
+    st.subheader("Churn rate")
+    churn_rate_df = pd.DataFrame(actual_table)
+    new_columns = ["Когорты"] + [f"Период {i+1}" for i in range(len(column_headers))]
+    churn_rate_df.columns = new_columns
+    churn_rate_df = churn_rate_df.astype(object)
+    churn_rate_df.iloc[:, 0] = churn_rate_df.iloc[:, 0].astype(str)
+
+    for row_idx in range(len(actual_table)):
+        for col_idx in range(1, len(new_columns)):
+            curr_col_idx = col_idx - 1 + row_idx
+            prev_col_idx = col_idx - 2 + row_idx
+            if curr_col_idx < len(column_headers) and prev_col_idx >= 0 and prev_col_idx < len(column_headers):
+                curr_val = actual_table[row_idx].get(column_headers[curr_col_idx], 0)
+                prev_val = actual_table[row_idx].get(column_headers[prev_col_idx], 0)
+                if isinstance(curr_val, (int, float)) and isinstance(prev_val, (int, float)) and prev_val > 0:
+                    churn = 1 - (curr_val / prev_val)
+                    if abs(churn) < 0.0001:
+                        churn_rate_df.iloc[row_idx, col_idx] = ""
+                    else:
+                        churn_rate_df.iloc[row_idx, col_idx] = f"{churn * 100:.2f}%"
+                else:
+                    churn_rate_df.iloc[row_idx, col_idx] = ""
+            else:
+                churn_rate_df.iloc[row_idx, col_idx] = ""
+
+    st.dataframe(churn_rate_df, use_container_width=True, hide_index=True)
+
+    churn_rate_df.loc[churn_rate_df["Когорты"] == "ВСЕГО", "Когорты"] = "В среднем"
+
 
 def render_section(section: str, start_date: datetime, end_date: datetime, **kwargs) -> None:
     """Render appropriate section based on selection."""
