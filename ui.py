@@ -1316,13 +1316,17 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     gp_per_client_df = pd.DataFrame(gp_per_client_table)
     st.dataframe(gp_per_client_df, use_container_width=True, hide_index=True)
 
+    max_cohort_num = len(cohorts_df)
+    cohort_number = st.number_input("Выберите номер когорты для расчета CLV", value=1, min_value=1, max_value=max_cohort_num, step=1, key="clv_cohort_number")
+
     st.subheader("Расчет Customer Lifetime Value (CLV)")
-    avg_profit_per_client = gp_per_client_table[0].get("ВСЕГО", "") if gp_per_client_table else ""
-    churn_rate_first_row = churn_rate_df.iloc[0]["В среднем за все время"] if not churn_rate_df.empty and "В среднем за все время" in churn_rate_df.columns else ""
+    idx = cohort_number - 1
+    avg_profit_per_client = gp_per_client_table[idx].get("ВСЕГО", "") if gp_per_client_table and idx < len(gp_per_client_table) else ""
+    churn_rate_val_str = churn_rate_df.iloc[idx]["В среднем за все время"] if not churn_rate_df.empty and "В среднем за все время" in churn_rate_df.columns and idx < len(churn_rate_df) else ""
     churn_rate_val = 0
-    if churn_rate_first_row and isinstance(churn_rate_first_row, str) and "%" in churn_rate_first_row:
+    if churn_rate_val_str and isinstance(churn_rate_val_str, str) and "%" in churn_rate_val_str:
         try:
-            churn_rate_val = float(churn_rate_first_row.replace("%", "")) / 100
+            churn_rate_val = float(churn_rate_val_str.replace("%", "")) / 100
         except:
             churn_rate_val = 0
     lifetime_val = f"{1 / churn_rate_val:.2f}" if churn_rate_val > 0 else ""
@@ -1334,9 +1338,9 @@ def render_cohort_analysis(cohort_dates: list) -> None:
             avg_profit_val = 0
     clv_val = f"${avg_profit_val / churn_rate_val:,.2f}" if churn_rate_val > 0 else ""
     clv_table = [
-        {"Показатель": "Ср. прибыль с клиента за квартал (по первой когорте)", "Значение": avg_profit_per_client},
-        {"Показатель": "Churn rate (по Когорте 1)", "Значение": churn_rate_first_row},
-        {"Показатель": "Средняя длительность Lifetime", "Значение": lifetime_val},
+        {"Показатель": "Ср. прибыль с клиента за период (по выбранной когорте)", "Значение": avg_profit_per_client},
+        {"Показатель": "Churn rate (по выбранной когорте)", "Значение": churn_rate_val_str},
+        {"Показатель": "Средняя длительность Lifetime (периодов)", "Значение": lifetime_val},
         {"Показатель": "CLV", "Значение": clv_val}
     ]
     clv_df = pd.DataFrame(clv_table)
