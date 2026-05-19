@@ -1252,6 +1252,40 @@ def render_cohort_analysis(cohort_dates: list) -> None:
 
     st.dataframe(churn_rate_df, use_container_width=True, hide_index=True)
 
+    st.subheader("Валовая прибыль по когортам")
+    gross_profit_table = []
+    for cohort_idx, cohort_name in enumerate(cohort_names):
+        row = {"Когорты": cohort_name}
+        total_profit = 0.0
+        for col in column_headers:
+            col_cohort = cohort_map[col]
+            date_start = pd.to_datetime(col_cohort["date_start"])
+            date_end = pd.to_datetime(col_cohort["date_end"])
+
+            if not sales_df.empty and "purchase_date_dt" in sales_df.columns and "cohort" in sales_df.columns:
+                mask = (sales_df["purchase_date_dt"] >= date_start) & (sales_df["purchase_date_dt"] <= date_end) & (sales_df["cohort"] == cohort_name)
+                revenue = float(sales_df.loc[mask, "Revenue"].sum()) if "Revenue" in sales_df.columns else 0.0
+                cost = float(sales_df.loc[mask, "cost"].sum()) if "cost" in sales_df.columns else 0.0
+                profit = revenue - cost
+            else:
+                profit = 0.0
+
+            row[col] = f"${profit:,.2f}" if profit > 0 else ""
+            total_profit += profit
+        row["ВСЕГО"] = f"${total_profit:,.2f}" if total_profit > 0 else ""
+        gross_profit_table.append(row)
+
+    total_row = {"Когорты": "ВСЕГО"}
+    for col in column_headers:
+        col_sum = sum(float(row[col].replace("$", "").replace(",", "")) for row in gross_profit_table if isinstance(row[col], str) and row[col])
+        total_row[col] = f"${col_sum:,.2f}" if col_sum > 0 else ""
+    grand_total = sum(float(row["ВСЕГО"].replace("$", "").replace(",", "")) for row in gross_profit_table if isinstance(row["ВСЕГО"], str) and row["ВСЕГО"])
+    total_row["ВСЕГО"] = f"${grand_total:,.2f}" if grand_total > 0 else ""
+    gross_profit_table.append(total_row)
+
+    gross_profit_df = pd.DataFrame(gross_profit_table)
+    st.dataframe(gross_profit_df, use_container_width=True, hide_index=True)
+
 
 def render_section(section: str, start_date: datetime, end_date: datetime, **kwargs) -> None:
     """Render appropriate section based on selection."""
