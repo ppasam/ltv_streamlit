@@ -39,9 +39,23 @@ Simply refreshing the browser will NOT show changes. The container must be rebui
 
 ## Versions
 
+- v0.2.1 - Add pytest unit tests for analysis.py module
 - v0.2.0 - CLV table with cohort selector and CAC:CLV ratio input
 - v0.1.11 - Add CLV calculation table with CAC:CLV ratio
 - v0.1.1 - Cohort analysis tables and stacked area chart
+
+## Testing
+
+```bash
+# Run all tests
+python3 -m pytest test_analysis.py -v
+
+# Lint with flake8
+flake8 analysis.py --max-line-length=120
+
+# Format with black
+black analysis.py
+```
 
 ## PostgreSQL Tables
 
