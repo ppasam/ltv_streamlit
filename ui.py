@@ -1209,9 +1209,21 @@ def render_cohort_analysis(cohort_dates: list) -> None:
             else:
                 churn_rate_df.iloc[row_idx, col_idx] = ""
 
-    st.dataframe(churn_rate_df, use_container_width=True, hide_index=True)
+    if "ВСЕГО" in churn_rate_df["Когорты"].values:
+        for col in churn_rate_df.columns[1:]:
+            churn_rate_df.loc[churn_rate_df["Когорты"] == "ВСЕГО", col] = ""
 
-    churn_rate_df.loc[churn_rate_df["Когорты"] == "ВСЕГО", "Когорты"] = "В среднем"
+        for period_idx in range(2, len(new_columns)):
+            diag_offset = period_idx - 1
+            curr_diag_sum = sum(actual_table[i].get(column_headers[i + diag_offset], 0) for i in range(len(actual_table) - 1 - diag_offset) if i + diag_offset < len(column_headers))
+            prev_diag_sum = sum(actual_table[i].get(column_headers[i + diag_offset - 1], 0) for i in range(len(actual_table) - 1 - diag_offset) if i + diag_offset - 1 < len(column_headers))
+            if prev_diag_sum > 0:
+                churn = 1 - (curr_diag_sum / prev_diag_sum)
+                churn_rate_df.loc[churn_rate_df["Когорты"] == "ВСЕГО", new_columns[period_idx]] = f"{churn * 100:.2f}%"
+
+        churn_rate_df.loc[churn_rate_df["Когорты"] == "ВСЕГО", "Когорты"] = "В среднем"
+
+    st.dataframe(churn_rate_df, use_container_width=True, hide_index=True)
 
 
 def render_section(section: str, start_date: datetime, end_date: datetime, **kwargs) -> None:
