@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ltv_db
+      POSTGRES_USER: ltv_user
+      POSTGRES_PASSWORD: ltv_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ltv_user -d ltv_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  streamlit:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://ltv_user:ltv_pass@postgres:5432/ltv_db
+
+volumes:
+  postgres_data:
