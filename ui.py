@@ -1209,6 +1209,10 @@ def render_cohort_analysis(cohort_dates: list) -> None:
             else:
                 churn_rate_df.iloc[row_idx, col_idx] = ""
 
+    def _val(row, col):
+        v = row.get(col, 0)
+        return v if isinstance(v, (int, float)) else 0
+
     num_cohorts = len(column_headers)
     for row_idx in range(len(actual_table) - 1):
         k = row_idx + 1
@@ -1217,10 +1221,6 @@ def render_cohort_analysis(cohort_dates: list) -> None:
         if isinstance(x, (int, float)) and isinstance(y, (int, float)) and y > 0 and k < num_cohorts:
             churn = 1 - (x / y) ** (1 / (num_cohorts - k))
             churn_rate_df.iloc[row_idx, -1] = f"{churn * 100:.2f}%"
-
-    def _val(row, col):
-        v = row.get(col, 0)
-        return v if isinstance(v, (int, float)) else 0
 
     if "ВСЕГО" in churn_rate_df["Когорты"].values:
         for col in churn_rate_df.columns[1:]:
