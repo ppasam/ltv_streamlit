@@ -1,238 +1,83 @@
 # AGENTS.md
 
-## Project Structure
-
-- `app.py` - Main Streamlit application entry point
-- `ui.py` - Streamlit UI components including RFM analysis
-- `data_loader.py` - Data loading and PostgreSQL caching module
-- `cohorts.py` - Cohort calculation logic with bidirectional recalculation
-- `analysis.py` - Data analysis functions (overall, RFM, cohort)
-- `plotting.py` - Plotly visualization functions
-- `data/` - Excel data templates
-
-## Running the Application
+## Run & Deploy
 
 ```bash
-docker compose up -d --build
-```
+# Local (Docker) — rebuild on every code change
+docker compose up -d --build          # http://localhost:8501
 
-Access Streamlit at http://localhost:8501
-
-## Critical: Docker Rebuild Required
-
-**Every code change requires rebuild:**
-```bash
-docker compose up -d --build
-```
-Simply refreshing the browser will NOT show changes. The container must be rebuilt.
-
-## Dependencies
-
-- PostgreSQL (for data storage, **local/Docker only** — not available on Streamlit Cloud)
-- Streamlit, Pandas, Plotly, psycopg2-binary, openpyxl, SQLAlchemy
-
-## Data Templates
-
-- `data/sales_template.xlsx` - Sales data
-- `data/promotion_costs_template.xlsx` - Promotion costs
-- `data/other_marketing_costs_template.xlsx` - Other marketing costs
-
-## Versions
-
-- v0.2.2 - Update AGENTS.md with testing section and latest versions
-- v0.2.1 - Add pytest unit tests for analysis.py module
-- v0.2.0 - CLV table with cohort selector and CAC:CLV ratio input
-
-## Testing
-
-```bash
-# Run all tests
+# Tests
 python3 -m pytest test_analysis.py -v
 
-# Lint with flake8
+# Lint
 flake8 analysis.py --max-line-length=120
-
-# Format with black
-black analysis.py
 ```
 
-## PostgreSQL Tables
+`app.py` is the entrypoint. Layout: `st.set_page_config(layout="wide")`.
 
-`clients`, `cohorts`, `other_marketing_costs`, `promotion_costs`, `sales`
+## Database
 
-### clients table columns
+Two deployment modes. Same codebase.
 
-`client_id`, `num_orders`, `first_order_date`, `last_order_date`, `total_amount`, `first_order_id`, `first_order_channel`, `cohort`, `Recency_Segment`, `Frequency_Segment`, `Monetary_Segment`
+| Mode | DB | DATABASE_URL source |
+|------|----|---------------------|
+| Local Docker | PostgreSQL container (`ltv_user:ltv_pass@postgres:5432/ltv_db`) | `docker-compose.yml` env |
+| Streamlit Cloud | Supabase session pooler | `st.secrets["DATABASE_URL"]` |
 
-Note: `last_order_date` and `first_order_date` stored as `text` in DB, parse with `format="%Y-%m-%d"` in pandas.
+Priority: `st.secrets["DATABASE_URL"]` → `os.environ["DATABASE_URL"]` → local default.
 
-## RFM Analysis - Session State Keys
+On first run, `check_tables_exist()` checks for `sales` + `clients` tables. If missing, `init_database_from_templates()` loads `data/templates_data/*.xlsx` → Supabase.
 
-Each R/F/M section has its own independent session state keys to avoid collisions:
+### Tables
 
-| Section | session_state keys | number_input keys |
-|---------|-------------------|-------------------|
-| Recency | `rfm_values_r`, `rfm_key_r` | `r2_{key}`, `r3_{key}`, `r4_{key}` |
-| Frequency | `rfm_values_f`, `rfm_key_f` | `f2_{key}`, `f3_{key}`, `f4_{key}` |
-| Monetary | `monetary_values_m`, `monetary_key_m`, `monetary_prev_values_m` | `monetary_m2_{key}`, `monetary_m3_{key}`, `monetary_m4_{key}` |
+| Table | Key columns | Notes |
+|-------|-------------|-------|
+| `sales` | `purchase_date`, `order_price`, `client_id`, `acquisition_channel`, `cohort` | Renamed on load: `purchase_date`→`Date`, `order_price`→`Revenue`, `client_id`→`Customer ID` |
+| `clients` | `client_id`, `num_orders`, `first_order_date`, `last_order_date`, `total_amount`, `cohort` | Dates stored as TEXT, parse with `format="%Y-%m-%d"` |
+| `cohorts` | `cohort`, `date_start`, `date_end` | Supabase returns dates as str → `pd.to_datetime()` before use |
+| `promotion_costs` | `channels`, `expenses_date`, `costs`, `cohort` | — |
+| `other_marketing_costs` | `channels`, `expenses_date`, `costs`, `cohort` | — |
 
-## Monetary - Decimal Calculations
+### Batch SQL Pattern (Supabase timeouts)
 
-All financial calculations use `Decimal` with `ROUND_HALF_UP`. Float is used only for Streamlit number_input display. Pattern:
+All DB writes use batch operations via temp tables. Never row-by-row:
 
 ```python
-from decimal import Decimal, ROUND_HALF_UP
-COUNTER_STEP = Decimal("0.01")
-m2_raw = st.number_input(...)  # float
-m2_d = Decimal(str(m2_raw)).quantize(COUNTER_STEP, rounding=ROUND_HALF_UP)
+cohort_map.to_sql("_tmp", engine, if_exists="replace", index=False)
+with engine.begin() as conn:
+    conn.execute(text("UPDATE target SET col = t.col FROM _tmp t WHERE ..."))
+    conn.execute(text("DROP TABLE IF EXISTS _tmp"))
 ```
 
-## Monetary - Min/Float Trick
+Segment saves (`Recency_Segment`, `Frequency_Segment`, `Monetary_Segment`) are wrapped in try/except — non-critical.
 
-Streamlit's button deactivation uses `<=` (not `<`). To allow minus button when value is 0.03, min must be below the value. Use per-segment float mins slightly below Decimal min. Also handle edge case when max < min:
+### Performance
 
-```python
-min_float_m2 = float(Decimal("0.019"))
-max_float_m2 = max(min_float_m2, float(max_monetary - Decimal("0.02")))
-if max_float_m2 < min_float_m2:
-    max_float_m2 = min_float_m2
-```
+Cohort recalculation (`update_cohorts_in_db` + `populate_clients_from_sales`) only runs when params change (`_cohort_params` session state key). `st.cache_data.clear()` is NOT called on every page render.
 
-## Monetary - Propagation Logic
+`load_cohorts_from_db()` and `load_sales_from_db()` are `@st.cache_data(ttl=3600)`.
 
-When a Monetary counter changes, neighboring counters auto-adjust to maintain:
-1. `max_monetary >= m4 >= m3 >= m2`
-2. Min difference between neighbors: 0.01
+## Modules
 
-Uses `monetary_prev_values_m` to detect which counter changed, then propagates up/down.
+| File | Responsibility |
+|------|---------------|
+| `app.py` | Session init, sidebar, section routing |
+| `ui.py` | All Streamlit rendering (4 sections: Общий/RFM/Когортный/Загрузка) |
+| `data_loader.py` | DB connection, Excel loading, init, batch writes |
+| `cohorts.py` | Cohort math: date splitting, bidirectional recalculation |
+| `analysis.py` | Pandas calculations for all tables/charts |
+| `plotting.py` | Plotly figures (`hex_to_rgba`, stacked area, pie, bar) |
 
-## Monetary - Default Values
+## RFM Analysis
 
-If `max_monetary_per_customer > 25000`: defaults are `[3000.00, 10000.00, 25000.00]`
-Otherwise: defaults are `[a-0.02, a-0.01, a]` where `a = max_monetary`
+- **Session state keys are per-section** to avoid collisions: Recency uses `rfm_values_r`/`rfm_key_r`, Frequency uses `rfm_values_f`/`rfm_key_f`, Monetary uses `monetary_values_m`/`monetary_key_m`/`monetary_prev_values_m`.
+- **Monetary** uses `Decimal` with `ROUND_HALF_UP`. Float only for `st.number_input` display. Propagation rule: `max >= m4 >= m3 >= m2` with 0.01 min step.
+- **RF Matrix** is rendered as raw HTML tables with inline CSS (colors in AGENTS.md table section).
+- **Segment columns** in `clients` table are recomputed in-memory each render; DB save is optional.
 
-## Recency - Max from Date Range
+## Key Gotchas
 
-`render_rfm_analysis(start_date, end_date)` takes date parameters. Max days for R section:
-```python
-max_r = (end_date - start_date).days
-```
-
-## Recency - Table Column "дата - с"
-
-Calculated as `end_date - timedelta(days=по)` for each row.
-
-## Recency - "Кол-во клиентов" Calculation
-
-For each row, dates are calculated from `end_date` and columns `с`, `по`:
-- `date_from = end_date - timedelta(days=по)` — lower bound
-- `date_to = end_date - timedelta(days=с)` — upper bound
-
-Count clients where `last_order_date` is in range `[date_from, date_to]`. Example row с=0, по=29:
-- `date_from = 2014-12-31 - 29 = 2014-12-02`
-- `date_to = 2014-12-31 - 0 = 2014-12-31`
-
-## Frequency - Segment Assignment
-
-For each client, `Frequency_Segment` = first `№ сегмента F` where `num_orders <= max_n` (sorted ascending by max_n).
-
-## Monetary - Segment Assignment
-
-For each client, `Monetary_Segment` = first `№ сегмента M` where `total_amount <= по` (sorted ascending by по).
-
-## RF Matrix
-
-Located after Monetary table. Uses HTML tables with inline CSS for coloring. Color scheme:
-- Ушедшие: `#999999` (gray)
-- Уходящие VIP: `#FF8C00` (orange)
-- VIP: `#FFD700` (gold)
-- Уходящие: `#FF7043` (coral)
-- Норма: `#42A5F5` (blue)
-- Одноразовые: `#26A69A` (teal)
-- Новички: `#66BB6A` (green)
-
-## Streamlit Tables - Include All Columns Explicitly
-
-`st.dataframe()` displays only columns explicitly included in the dict/list passed to it. Example:
-
-```python
-# WRONG - missing columns
-st.dataframe([{"с": ..., "по": ..., "№ сегмента M": ...}])
-
-# CORRECT - all columns included
-st.dataframe([{"с": ..., "по": ..., "Кол-во клиентов": ..., "Доля": ..., "№ сегмента M": ...}])
-```
-
-## Streamlit - Dynamic Key Rerun Pattern
-
-When counter value changes and needs to propagate, increment key and rerun:
-```python
-if new_value != old_value:
-    st.session_state.some_key = some_key + 1
-    st.rerun()
-```
-
-This forces Streamlit to re-render with updated constraints.
-
-## Git Workflow
-
-Commits are pushed directly to main. Tags used for releases (e.g., `v0.1.0`).
-
-## Когортный анализ Tables
-
-### "Когорты клиентов" table
-- Source: `cohorts` and `clients` tables from DB
-- Columns from `cohorts`: `date_start` → "Дата перв. заказа - с", `cohort` → "Номер когорты"
-- "Кол-во клиентов": count clients where `date_end >= first_order_date >= date_start`
-- "Сумма всех их покупок": sum `total_amount` where same condition, formatted as `$X,XXX.XX`
-
-### "Выручка по когортам" table
-- Source: `cohorts` and `sales` tables from DB
-- Rows: cohort names from `cohorts.cohort`
-- Columns: `date_end` values from `cohorts`
-- Cell values: sum `order_price` from `sales` where `date_end >= purchase_date >= date_start` AND `sales.cohort = row_cohort`
-- "ВСЕГО" column: sum of all column values per row
-
-### "Количество активных клиентов" table
-- Source: `cohorts` and `sales` tables from DB
-- Same structure as "Выручка по когортам" (same rows and columns)
-- Cell values: `nunique()` count of `client_id` from `sales` where `date_end >= purchase_date >= date_start` AND `sales.cohort = row_cohort`
-- Row "ВСЕГО" at bottom with column sums
-
-### "Количество активных клиентов (приведено к началу жизненного цикла)" table
-- Same logic as "Количество активных клиентов"
-- Columns renamed to "Период 1", "Период 2"... up to "Период N" (where N = number of cohorts)
-- Values shifted left: row 1 has N values, row 2 has N-1 values, etc.
-- Each row starts from column 2 (period 1) with values from corresponding row of "Количество активных клиентов"
-
-### Stacked Area Chart (plotting.py)
-- Function: `create_cohort_revenue_chart(revenue_df)`
-- Uses `stackgroup="cohort_revenue"` for stacked area
-- Colors from `px.colors.qualitative.Set1/Set2/Dark24`
-- Use `hex_to_rgba()` helper (defined in plotting.py) to convert colors to rgba with alpha=0.6
-- Legend positioned on the right side
-
-## PostgreSQL Tables Detail
-
-### cohorts
-`cohort`, `date_start`, `date_end`
-
-### sales
-`purchase_date`, `order_id`, `order_price`, `cost`, `client_id`, `acquisition_channel`, `cohort`
-
-Note: `load_sales_from_db()` renames columns: `purchase_date` → `Date`, `order_price` → `Revenue`, `client_id` → `Customer ID`
-
-## CLV Calculation Table
-
-- Located in `render_cohort_analysis()` in ui.py
-- Cohort selector: `st.number_input("Выберите номер когорты для расчета CLV", ...)` with key `clv_cohort_number`
-- Row 1: "Ср. прибыль с клиента за период (по выбранной когорте)" — from `gp_per_client_table[cohort_number-1]["ВСЕГО"]`
-- Row 2: "Churn rate (по выбранной когорте)" — from `churn_rate_df.iloc[cohort_number-1]["В среднем за все время"]`
-- Row 3: "Средняя длительность Lifetime (периодов)" = 1 / churn_rate_val
-- Row 4: "CLV" = row1 / churn_rate_val formatted as `$X,XXX.XX`
-
-## CAC:CLV Ratio
-
-- Two `st.number_input` widgets with keys `cac_clv_ratio_num` (default 1) and `cac_clv_ratio_denom` (default 3)
-- Calculated: `acceptable_cac = clv_val * cac_ratio / clv_ratio` formatted as `$X,XXX.XX`
-- Recalculates on every page render (including widget changes)
+- `st.dataframe()` only shows explicitly included dict keys — always list all columns.
+- Counter propagation uses increment-key + `st.rerun()` pattern.
+- Git: push directly to `main`, no PR workflow. Tags for releases.
+- `data/download_data/` is created on demand via `os.makedirs(exist_ok=True)`.
