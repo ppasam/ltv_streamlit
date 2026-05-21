@@ -1,5 +1,4 @@
 """Main Streamlit application for LTV analysis."""
-import os
 from datetime import datetime
 
 import streamlit as st
@@ -13,15 +12,12 @@ st.set_page_config(page_title="LTV", layout="wide")
 
 st.title("LTV")
 
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://ltv_user:ltv_pass@localhost:5432/ltv_db"
-)
-
 if "initialized" not in st.session_state:
-    st.session_state.initialized = False
-    data_loader.init_database_from_templates()
-    st.session_state.initialized = True
+    if data_loader.check_tables_exist():
+        st.session_state.initialized = True
+    else:
+        data_loader.init_database_from_templates()
+        st.session_state.initialized = True
 
 if "cohort_size_input" not in st.session_state:
     st.session_state.cohort_size_input = 3

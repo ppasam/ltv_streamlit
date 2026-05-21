@@ -10,11 +10,17 @@ from sqlalchemy import create_engine, text
 
 
 def get_database_url() -> str:
-    """Get database URL from environment or use default."""
-    return os.environ.get(
-        "DATABASE_URL",
-        "postgresql://ltv_user:ltv_pass@localhost:5432/ltv_db"
-    )
+    """Get database URL from Streamlit secrets, environment, or use default."""
+    try:
+        return st.secrets.get(
+            "DATABASE_URL",
+            os.environ.get("DATABASE_URL", "postgresql://ltv_user:ltv_pass@localhost:5432/ltv_db")
+        )
+    except Exception:
+        return os.environ.get(
+            "DATABASE_URL",
+            "postgresql://ltv_user:ltv_pass@localhost:5432/ltv_db"
+        )
 
 
 def get_excel_file_path(filename: str, subfolder: str = "templates_data") -> str:
@@ -30,11 +36,32 @@ def get_download_data_path(filename: str) -> str:
 def clear_download_data_folder() -> None:
     """Clear all files in download_data folder."""
     download_path = os.path.join("data", "download_data")
-    if os.path.exists(download_path):
-        for file in os.listdir(download_path):
-            file_path = os.path.join(download_path, file)
-            if os.path.isfile(file_path):
-                os.remove(file_path)
+    os.makedirs(download_path, exist_ok=True)
+    for file in os.listdir(download_path):
+        file_path = os.path.join(download_path, file)
+        if os.path.isfile(file_path):
+            os.remove(file_path)
+
+
+def check_tables_exist() -> bool:
+    """Check if required database tables exist and have data."""
+    try:
+        db_url = get_database_url()
+        conn = psycopg2.connect(db_url)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'sales')"
+        )
+        sales_exists = cursor.fetchone()[0]
+        cursor.execute(
+            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'clients')"
+        )
+        clients_exists = cursor.fetchone()[0]
+        cursor.close()
+        conn.close()
+        return bool(sales_exists and clients_exists)
+    except Exception:
+        return False
 
 
 def get_current_data_source() -> dict:
@@ -399,8 +426,6 @@ def add_cohort_to_sales() -> None:
     if not exists:
         cur.execute("ALTER TABLE sales ADD COLUMN cohort VARCHAR")
         conn.commit()
-    
-    cur.close()
     
     cur.close()
     conn.close()
