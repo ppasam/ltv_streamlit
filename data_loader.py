@@ -693,4 +693,8 @@ def load_cohorts_from_db() -> pd.DataFrame:
 
     df = pd.read_sql("SELECT * FROM cohorts ORDER BY date_start", conn)
     conn.close()
+    if not df.empty:
+        for col in ["date_start", "date_end"]:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col])
     return df

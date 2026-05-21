@@ -72,8 +72,8 @@ def calculate_overall_metrics(
             "Прочие затраты", "Прибыль", "Маржа"
         ],
         "Значение": [
-            unique_customers, period_start_str, period_end_str,
-            num_orders, avg_orders_per_customer, max_orders_per_customer,
+            str(unique_customers), period_start_str, period_end_str,
+            str(num_orders), str(avg_orders_per_customer), str(max_orders_per_customer),
             avg_order_price, min_order_price, max_order_price,
             min_revenue_per_customer, max_revenue_per_customer,
             total_revenue_str, total_cost_str, avg_margin,

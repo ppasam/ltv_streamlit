@@ -12,6 +12,28 @@ import cohorts
 import data_loader
 import plotting
 import psycopg2
+from sqlalchemy import create_engine, text
+
+
+def _save_segment_column(clients_df: pd.DataFrame, column: str) -> None:
+    """Batch-save a segment column to the clients table."""
+    if clients_df is None or clients_df.empty or column not in clients_df.columns:
+        return
+    db_url = data_loader.get_database_url()
+    engine = create_engine(db_url)
+    with engine.begin() as conn:
+        conn.execute(text(f"ALTER TABLE clients ADD COLUMN IF NOT EXISTS {column} INTEGER"))
+    seg_map = clients_df[["client_id", column]].dropna()
+    seg_map[column] = seg_map[column].astype(int)
+    seg_map.to_sql("_tmp_seg", engine, if_exists="replace", index=False)
+    with engine.begin() as conn:
+        conn.execute(text(f"""
+            UPDATE clients c
+            SET {column} = t.{column}
+            FROM _tmp_seg t
+            WHERE c.client_id = t.client_id
+        """))
+        conn.execute(text("DROP TABLE IF EXISTS _tmp_seg"))
 
 
 def render_sidebar(start_date: datetime, end_date: datetime) -> tuple:
@@ -525,19 +547,7 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         clients_df["Recency_Segment"] = clients_df["last_order_date"].apply(get_recency_segment)
 
         # Save Recency_Segment to database
-        db_url = data_loader.get_database_url()
-        conn = psycopg2.connect(db_url)
-        cur = conn.cursor()
-        cur.execute("""
-            ALTER TABLE clients ADD COLUMN IF NOT EXISTS Recency_Segment INTEGER
-        """)
-        for _, row in clients_df.iterrows():
-            cur.execute("""
-                UPDATE clients SET Recency_Segment = %s WHERE client_id = %s
-            """, (int(row["Recency_Segment"]), int(row["client_id"])))
-        conn.commit()
-        cur.close()
-        conn.close()
+        _save_segment_column(clients_df, "Recency_Segment")
 
     st.divider()
 
@@ -631,19 +641,7 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         clients_df["Frequency_Segment"] = clients_df["num_orders"].apply(get_frequency_segment)
 
         # Save Frequency_Segment to database
-        db_url = data_loader.get_database_url()
-        conn = psycopg2.connect(db_url)
-        cur = conn.cursor()
-        cur.execute("""
-            ALTER TABLE clients ADD COLUMN IF NOT EXISTS Frequency_Segment INTEGER
-        """)
-        for _, row in clients_df.iterrows():
-            cur.execute("""
-                UPDATE clients SET Frequency_Segment = %s WHERE client_id = %s
-            """, (int(row["Frequency_Segment"]), int(row["client_id"])))
-        conn.commit()
-        cur.close()
-        conn.close()
+        _save_segment_column(clients_df, "Frequency_Segment")
 
     st.divider()
 
@@ -797,19 +795,7 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
         clients_df["Monetary_Segment"] = clients_df["total_amount"].apply(get_monetary_segment)
 
         # Save Monetary_Segment to database
-        db_url = data_loader.get_database_url()
-        conn = psycopg2.connect(db_url)
-        cur = conn.cursor()
-        cur.execute("""
-            ALTER TABLE clients ADD COLUMN IF NOT EXISTS Monetary_Segment INTEGER
-        """)
-        for _, row in clients_df.iterrows():
-            cur.execute("""
-                UPDATE clients SET Monetary_Segment = %s WHERE client_id = %s
-            """, (int(row["Monetary_Segment"]), int(row["client_id"])))
-        conn.commit()
-        cur.close()
-        conn.close()
+        _save_segment_column(clients_df, "Monetary_Segment")
 
     # RF Matrix
     st.divider()

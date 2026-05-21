@@ -92,10 +92,10 @@ class TestCalculateOverallMetrics:
         assert len(result) == 20
 
         idx = result[result["Показатель"] == "Количество уникальных клиентов"].index[0]
-        assert result.loc[idx, "Значение"] == 3
+        assert result.loc[idx, "Значение"] == "3"
 
         idx = result[result["Показатель"] == "Количество заказов"].index[0]
-        assert result.loc[idx, "Значение"] == 4
+        assert result.loc[idx, "Значение"] == "4"
 
     def test_empty_dataframe(self, empty_sales_df, promotion_df, marketing_df):
         result = calculate_overall_metrics(empty_sales_df, promotion_df, marketing_df)
