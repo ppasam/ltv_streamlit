@@ -8,6 +8,33 @@ import data_loader
 import plotting
 
 
+def _cohort_period_table(
+    cohort_names: list,
+    column_headers: list,
+    cohort_map: dict,
+    value_fn
+) -> list:
+    """Build a cohort × period table.
+
+    value_fn(cohort_name, date_start, date_end) → (display_value, numeric_inc)
+    Returns list of {Когорты, col..., _total}.
+    """
+    table = []
+    for cohort_name in cohort_names:
+        row = {"Когорты": cohort_name}
+        total = 0.0
+        for col in column_headers:
+            coh = cohort_map[col]
+            date_start = pd.to_datetime(coh["date_start"])
+            date_end = pd.to_datetime(coh["date_end"])
+            val, inc = value_fn(cohort_name, date_start, date_end)
+            row[col] = val
+            total += inc
+        row["_total"] = total
+        table.append(row)
+    return table
+
+
 def render_cohort_analysis(cohort_dates: list) -> None:
     """Render Когортный анализ section."""
     st.header("Когортный анализ")
@@ -60,25 +87,20 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     column_headers = [coh_row["date_end"].strftime("%Y-%m-%d") for _, coh_row in cohorts_df.iterrows()]
     cohort_names = [coh_row["cohort"] for _, coh_row in cohorts_df.iterrows()]
 
-    revenue_table = []
-    for cohort_name in cohort_names:
-        row = {"Когорты": cohort_name}
-        total_revenue = 0.0
-        for col in column_headers:
-            col_cohort = cohort_map[col]
-            date_start = pd.to_datetime(col_cohort["date_start"])
-            date_end = pd.to_datetime(col_cohort["date_end"])
+    has_sales = not sales_df.empty and "purchase_date_dt" in sales_df.columns and "cohort" in sales_df.columns
 
-            if not sales_df.empty and "purchase_date_dt" in sales_df.columns and "Revenue" in sales_df.columns and "cohort" in sales_df.columns:
-                mask = (sales_df["purchase_date_dt"] >= date_start) & (sales_df["purchase_date_dt"] <= date_end) & (sales_df["cohort"] == cohort_name)
-                revenue = float(sales_df.loc[mask, "Revenue"].sum())
-            else:
-                revenue = 0.0
-
-            row[col] = f"${revenue:,.2f}" if revenue > 0 else ""
-            total_revenue += revenue
-        row["ВСЕГО"] = f"${total_revenue:,.2f}" if total_revenue > 0 else ""
-        revenue_table.append(row)
+    revenue_table = _cohort_period_table(
+        cohort_names, column_headers, cohort_map,
+        lambda c, ds, de: (
+            (lambda rev: (f"${rev:,.2f}" if rev > 0 else "", rev))(
+                float(sales_df.loc[(sales_df["purchase_date_dt"] >= ds) & (sales_df["purchase_date_dt"] <= de) & (sales_df["cohort"] == c), "Revenue"].sum())
+            ) if has_sales and "Revenue" in sales_df.columns
+            else ("", 0.0)
+        )
+    )
+    for row in revenue_table:
+        t = row.pop("_total")
+        row["ВСЕГО"] = f"${t:,.2f}" if t > 0 else ""
 
     revenue_table_df = pd.DataFrame(revenue_table)
     st.dataframe(revenue_table_df, use_container_width=True, hide_index=True)
@@ -88,28 +110,26 @@ def render_cohort_analysis(cohort_dates: list) -> None:
         st.plotly_chart(revenue_chart, use_container_width=True)
 
     st.subheader("Количество активных клиентов")
-    active_clients_table = []
-    column_totals = {col: 0 for col in column_headers}
-    for cohort_name in cohort_names:
-        row = {"Когорты": cohort_name}
+    active_clients_table = _cohort_period_table(
+        cohort_names, column_headers, cohort_map,
+        lambda c, ds, de: (
+            (lambda n: (n if n > 0 else "", n))(
+                int(sales_df.loc[(sales_df["purchase_date_dt"] >= ds) & (sales_df["purchase_date_dt"] <= de) & (sales_df["cohort"] == c), "Customer ID"].nunique())
+            ) if has_sales and "Customer ID" in sales_df.columns
+            else ("", 0)
+        )
+    )
+    for row in active_clients_table:
+        t = row.pop("_total")
         for col in column_headers:
-            col_cohort = cohort_map[col]
-            date_start = pd.to_datetime(col_cohort["date_start"])
-            date_end = pd.to_datetime(col_cohort["date_end"])
-
-            if not sales_df.empty and "purchase_date_dt" in sales_df.columns and "Customer ID" in sales_df.columns and "cohort" in sales_df.columns:
-                mask = (sales_df["purchase_date_dt"] >= date_start) & (sales_df["purchase_date_dt"] <= date_end) & (sales_df["cohort"] == cohort_name)
-                active_count = int(sales_df.loc[mask, "Customer ID"].nunique())
-            else:
-                active_count = 0
-
-            row[col] = active_count if active_count > 0 else ""
-            column_totals[col] += active_count
-        active_clients_table.append(row)
+            if row[col] == "" or row[col] == 0:
+                row[col] = ""
+        row["ВСЕГО"] = t if t > 0 else ""
 
     total_row = {"Когорты": "ВСЕГО"}
     for col in column_headers:
-        total_row[col] = column_totals[col] if column_totals[col] > 0 else ""
+        col_sum = sum(r.get(col, 0) for r in active_clients_table if isinstance(r.get(col, 0), (int, float)))
+        total_row[col] = col_sum if col_sum > 0 else ""
     active_clients_table.append(total_row)
 
     active_clients_table_df = pd.DataFrame(active_clients_table)
@@ -391,27 +411,18 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     st.dataframe(churn_rate_df, use_container_width=True, hide_index=True)
 
     st.subheader("Валовая прибыль по когортам")
-    gross_profit_table = []
-    for cohort_idx, cohort_name in enumerate(cohort_names):
-        row = {"Когорты": cohort_name}
-        total_profit = 0.0
-        for col in column_headers:
-            col_cohort = cohort_map[col]
-            date_start = pd.to_datetime(col_cohort["date_start"])
-            date_end = pd.to_datetime(col_cohort["date_end"])
-
-            if not sales_df.empty and "purchase_date_dt" in sales_df.columns and "cohort" in sales_df.columns:
-                mask = (sales_df["purchase_date_dt"] >= date_start) & (sales_df["purchase_date_dt"] <= date_end) & (sales_df["cohort"] == cohort_name)
-                revenue = float(sales_df.loc[mask, "Revenue"].sum()) if "Revenue" in sales_df.columns else 0.0
-                cost = float(sales_df.loc[mask, "cost"].sum()) if "cost" in sales_df.columns else 0.0
-                profit = revenue - cost
-            else:
-                profit = 0.0
-
-            row[col] = f"${profit:,.2f}" if profit > 0 else ""
-            total_profit += profit
-        row["ВСЕГО"] = f"${total_profit:,.2f}" if total_profit > 0 else ""
-        gross_profit_table.append(row)
+    gross_profit_table = _cohort_period_table(
+        cohort_names, column_headers, cohort_map,
+        lambda c, ds, de: (
+            (lambda rev, cost: (f"${rev - cost:,.2f}" if rev - cost > 0 else "", rev - cost))(
+                float(sales_df.loc[(sales_df["purchase_date_dt"] >= ds) & (sales_df["purchase_date_dt"] <= de) & (sales_df["cohort"] == c), "Revenue"].sum()) if "Revenue" in sales_df.columns else 0.0,
+                float(sales_df.loc[(sales_df["purchase_date_dt"] >= ds) & (sales_df["purchase_date_dt"] <= de) & (sales_df["cohort"] == c), "cost"].sum()) if "cost" in sales_df.columns else 0.0
+            ) if has_sales else ("", 0.0)
+        )
+    )
+    for row in gross_profit_table:
+        t = row.pop("_total")
+        row["ВСЕГО"] = f"${t:,.2f}" if t > 0 else ""
 
     total_row = {"Когорты": "ВСЕГО"}
     for col in column_headers:
