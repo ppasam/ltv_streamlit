@@ -333,9 +333,8 @@ def load_sales_from_db(start_date: Optional[datetime] = None,
                        client_id, acquisition_channel, cohort
                 FROM sales
                 WHERE purchase_date >= :start_date AND purchase_date <= :end_date
-            """),
-            engine,
-            params={"start_date": start_date, "end_date": end_date}
+            """).bindparams(start_date=start_date, end_date=end_date),
+            engine
         )
     else:
         raw_df = pd.read_sql(
