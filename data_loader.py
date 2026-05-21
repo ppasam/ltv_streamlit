@@ -676,6 +676,7 @@ def populate_cohorts_table() -> None:
     conn.close()
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_cohorts_from_db() -> pd.DataFrame:
     """Load cohorts data from PostgreSQL."""
     db_url = get_database_url()

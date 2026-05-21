@@ -197,22 +197,28 @@ def render_overall_analysis(
 
     cohort_type = cohorts.COHORT_TYPE_MONTHS if not is_days else cohorts.COHORT_TYPE_DAYS
     calculation_mode = st.session_state.get("calculation_mode", "Cohort Size")
-    data_loader.update_cohorts_in_db(
-        start_date=selected_start_date,
-        end_date=selected_end_date,
-        cohort_type=cohort_type,
-        cohort_size=cohort_size,
-        num_cohorts=num_cohorts,
-        calculation_mode=calculation_mode
-    )
 
-    st.cache_data.clear()
+    params_key = (
+        selected_start_date, selected_end_date, cohort_size,
+        num_cohorts, calculation_mode, cohort_type
+    )
+    if st.session_state.get("_cohort_params") != params_key:
+        st.session_state._cohort_params = params_key
+        data_loader.update_cohorts_in_db(
+            start_date=selected_start_date,
+            end_date=selected_end_date,
+            cohort_type=cohort_type,
+            cohort_size=cohort_size,
+            num_cohorts=num_cohorts,
+            calculation_mode=calculation_mode
+        )
+        st.cache_data.clear()
+        data_loader.populate_clients_from_sales()
 
     sales_df = data_loader.load_sales_from_db(
         datetime.combine(selected_start_date, datetime.min.time()),
         datetime.combine(selected_end_date, datetime.min.time())
     )
-    data_loader.populate_clients_from_sales()
     clients_df = data_loader.load_clients_from_db()
     promotion_df = data_loader.load_promotion_costs_from_db()
     marketing_df = data_loader.load_other_marketing_costs_from_db()
@@ -919,7 +925,6 @@ def render_cohort_analysis(cohort_dates: list) -> None:
         sales_df = sales_df.copy()
         sales_df["purchase_date_dt"] = pd.to_datetime(sales_df["Date"], errors="coerce")
 
-    clients_df = data_loader.load_clients_from_db()
     if not clients_df.empty and "last_order_date" in clients_df.columns:
         clients_df = clients_df.copy()
         clients_df["last_order_date_dt"] = pd.to_datetime(clients_df["last_order_date"], format="%Y-%m-%d", errors="coerce")
