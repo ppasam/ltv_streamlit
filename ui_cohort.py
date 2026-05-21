@@ -130,6 +130,20 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     for col in column_headers:
         col_sum = sum(r.get(col, 0) for r in active_clients_table if isinstance(r.get(col, 0), (int, float)))
         total_row[col] = col_sum if col_sum > 0 else ""
+    # Calculate sum of "ВСЕГО" column for the total row
+    total_of_totals = sum(
+        int(r.get("ВСЕГО", 0)) 
+        for r in active_clients_table 
+        if isinstance(r.get("ВСЕГО"), (int, float)) or (isinstance(r.get("ВСЕГО"), str) and r.get("ВСЕГО") != "" and r.get("ВСЕГО").replace(",", "").replace("$", "").isdigit())
+    )
+    # Handle formatted currency strings in "ВСЕГО" column
+    if total_of_totals == 0:
+        total_of_totals = sum(
+            float(str(r.get("ВСЕГО", "")).replace("$", "").replace(",", "")) 
+            for r in active_clients_table 
+            if isinstance(r.get("ВСЕГО"), str) and r.get("ВСЕГО") != "" and str(r.get("ВСЕГО")).replace("$", "").replace(",", "").replace(".", "", 1).isdigit()
+        )
+    total_row["ВСЕГО"] = f"{int(total_of_totals):,}" if total_of_totals > 0 else ""
     active_clients_table.append(total_row)
 
     active_clients_table_df = pd.DataFrame(active_clients_table)
