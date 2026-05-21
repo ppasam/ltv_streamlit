@@ -7,7 +7,7 @@ import streamlit as st
 
 import cohorts
 import data_loader
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 
 
 def _save_segment_column(clients_df: pd.DataFrame, column: str) -> None:
@@ -15,8 +15,7 @@ def _save_segment_column(clients_df: pd.DataFrame, column: str) -> None:
     try:
         if clients_df is None or clients_df.empty or column not in clients_df.columns:
             return
-        db_url = data_loader.get_database_url()
-        engine = create_engine(db_url)
+        engine = data_loader.get_engine()
         with engine.begin() as conn:
             conn.execute(text(f"ALTER TABLE clients ADD COLUMN IF NOT EXISTS {column} INTEGER"))
         seg_map = clients_df[["client_id", column]].dropna()
@@ -78,7 +77,6 @@ def render_data_upload_section() -> None:
     data_sources = data_loader.get_current_data_source()
 
     sales_status = "✅ Шаблон по умолчанию" if data_sources["sales"] == "default" else "📁 Кастомные данные"
-    promotion_status = "✅ Шаблон по умолчанию" if data_sources["promotion_costs"] == "default" else "📁 Кастомные данные"
 
     st.subheader("1. Данные о продажах")
     st.markdown(f"**Статус:** {sales_status}")
@@ -108,11 +106,21 @@ def render_data_upload_section() -> None:
     with col_load1:
         uploaded_sales = st.file_uploader("📥 Загрузить свои данные", type=["xlsx"], key="upload_sales", label_visibility="collapsed")
         if uploaded_sales:
-            try:
-                data_loader.load_custom_sales_to_db(uploaded_sales)
+            file_key = f"s_{uploaded_sales.name}_{uploaded_sales.size}"
+            if st.session_state.get("upl_sales_key") != file_key:
+                st.session_state.upl_sales_key = file_key
+                st.session_state.upl_sales_ok = False
+                try:
+                    data_loader.load_custom_sales_to_db(uploaded_sales)
+                    st.session_state.upl_sales_ok = True
+                except Exception as e:
+                    st.error(f"Ошибка: {e}")
+
+            if st.session_state.get("upl_sales_ok", False):
                 st.success("Данные о продажах загружены!")
-            except Exception as e:
-                st.error(f"Ошибка: {e}")
+        else:
+            st.session_state.pop("upl_sales_key", None)
+            st.session_state.pop("upl_sales_ok", None)
 
     st.divider()
 
@@ -140,11 +148,21 @@ def render_data_upload_section() -> None:
     with col_load2:
         uploaded_promotion = st.file_uploader("📥 Загрузить свои данные", type=["xlsx"], key="upload_promotion", label_visibility="collapsed")
         if uploaded_promotion:
-            try:
-                data_loader.load_custom_promotion_costs_to_db(uploaded_promotion)
+            file_key = f"p_{uploaded_promotion.name}_{uploaded_promotion.size}"
+            if st.session_state.get("upl_promo_key") != file_key:
+                st.session_state.upl_promo_key = file_key
+                st.session_state.upl_promo_ok = False
+                try:
+                    data_loader.load_custom_promotion_costs_to_db(uploaded_promotion)
+                    st.session_state.upl_promo_ok = True
+                except Exception as e:
+                    st.error(f"Ошибка: {e}")
+
+            if st.session_state.get("upl_promo_ok", False):
                 st.success("Расходы на привлечение загружены!")
-            except Exception as e:
-                st.error(f"Ошибка: {e}")
+        else:
+            st.session_state.pop("upl_promo_key", None)
+            st.session_state.pop("upl_promo_ok", None)
 
     st.divider()
 
@@ -172,11 +190,21 @@ def render_data_upload_section() -> None:
     with col_load3:
         uploaded_marketing = st.file_uploader("📥 Загрузить свои данные", type=["xlsx"], key="upload_marketing", label_visibility="collapsed")
         if uploaded_marketing:
-            try:
-                data_loader.load_custom_other_marketing_costs_to_db(uploaded_marketing)
+            file_key = f"m_{uploaded_marketing.name}_{uploaded_marketing.size}"
+            if st.session_state.get("upl_mkt_key") != file_key:
+                st.session_state.upl_mkt_key = file_key
+                st.session_state.upl_mkt_ok = False
+                try:
+                    data_loader.load_custom_other_marketing_costs_to_db(uploaded_marketing)
+                    st.session_state.upl_mkt_ok = True
+                except Exception as e:
+                    st.error(f"Ошибка: {e}")
+
+            if st.session_state.get("upl_mkt_ok", False):
                 st.success("Прочие маркетинговые расходы загружены!")
-            except Exception as e:
-                st.error(f"Ошибка: {e}")
+        else:
+            st.session_state.pop("upl_mkt_key", None)
+            st.session_state.pop("upl_mkt_ok", None)
 
 
 def render_section(section: str, start_date: datetime, end_date: datetime, **kwargs) -> None:

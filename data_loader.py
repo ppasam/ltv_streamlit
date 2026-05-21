@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from typing import Optional, Tuple
 
 import pandas as pd
-import psycopg2
 import streamlit as st
 from sqlalchemy import create_engine, text
 
@@ -21,6 +20,12 @@ def get_database_url() -> str:
             "DATABASE_URL",
             "postgresql://ltv_user:ltv_pass@localhost:5432/ltv_db"
         )
+
+
+@st.cache_resource
+def get_engine():
+    """Get cached SQLAlchemy engine for database access."""
+    return create_engine(get_database_url())
 
 
 def get_excel_file_path(filename: str, subfolder: str = "templates_data") -> str:
@@ -46,19 +51,16 @@ def clear_download_data_folder() -> None:
 def check_tables_exist() -> bool:
     """Check if required database tables exist and have data."""
     try:
-        db_url = get_database_url()
-        conn = psycopg2.connect(db_url)
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'sales')"
-        )
-        sales_exists = cursor.fetchone()[0]
-        cursor.execute(
-            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'clients')"
-        )
-        clients_exists = cursor.fetchone()[0]
-        cursor.close()
-        conn.close()
+        engine = get_engine()
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'sales')")
+            )
+            sales_exists = result.scalar()
+            result = conn.execute(
+                text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'clients')")
+            )
+            clients_exists = result.scalar()
         return bool(sales_exists and clients_exists)
     except Exception:
         return False
@@ -67,7 +69,6 @@ def check_tables_exist() -> bool:
 def get_current_data_source() -> dict:
     """Check which data source is currently loaded in PostgreSQL."""
     download_path = os.path.join("data", "download_data")
-    templates_path = os.path.join("data", "templates_data")
 
     result = {
         "sales": "default",
@@ -153,8 +154,7 @@ def init_database_from_templates() -> None:
 
 def init_database() -> None:
     """Initialize database and load data from Excel templates."""
-    db_url = get_database_url()
-    engine = create_engine(db_url)
+    engine = get_engine()
 
     sales_df = load_sales_data()
     promotion_df = load_promotion_costs_data()
@@ -169,14 +169,12 @@ def init_database() -> None:
 def load_sales_from_db(start_date: Optional[datetime] = None,
                        end_date: Optional[datetime] = None) -> pd.DataFrame:
     """Load sales data from database with optional date filtering."""
-    db_url = get_database_url()
-
-    conn = psycopg2.connect(db_url)
-    cursor = conn.cursor()
-    cursor.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'sales')")
-    table_exists = cursor.fetchone()[0]
-    cursor.close()
-    conn.close()
+    engine = get_engine()
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'sales')")
+        )
+        table_exists = result.scalar()
 
     if not table_exists:
         create_clients_table()
@@ -188,9 +186,7 @@ def load_sales_from_db(start_date: Optional[datetime] = None,
     if start_date and end_date:
         query += f" WHERE purchase_date >= '{start_date.strftime('%Y-%m-%d')}' AND purchase_date <= '{end_date.strftime('%Y-%m-%d')}'"
 
-    conn = psycopg2.connect(db_url)
-    raw_df = pd.read_sql(query, conn)
-    conn.close()
+    raw_df = pd.read_sql(query, engine)
 
     df = raw_df.rename(columns={
         "purchase_date": "Date",
@@ -218,22 +214,19 @@ def _load_sales_from_excel(start_date: Optional[datetime] = None,
 def get_sales_date_range() -> Tuple[datetime, datetime]:
     """Get the min and max dates from sales data."""
     try:
-        db_url = get_database_url()
-        conn = psycopg2.connect(db_url)
-        cursor = conn.cursor()
-        cursor.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'sales')")
-        table_exists = cursor.fetchone()[0]
-        cursor.close()
-        conn.close()
+        engine = get_engine()
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'sales')")
+            )
+            table_exists = result.scalar()
 
         if table_exists:
-            conn = psycopg2.connect(db_url)
             query = "SELECT MIN(purchase_date) as min_date, MAX(purchase_date) as max_date FROM sales"
-            result = pd.read_sql(query, conn)
-            conn.close()
-            if not result.empty:
-                min_date = result["min_date"].iloc[0]
-                max_date = result["max_date"].iloc[0]
+            result_df = pd.read_sql(query, engine)
+            if not result_df.empty:
+                min_date = result_df["min_date"].iloc[0]
+                max_date = result_df["max_date"].iloc[0]
                 if isinstance(min_date, str):
                     min_date = datetime.strptime(min_date.split(' ')[0], '%Y-%m-%d')
                 if isinstance(max_date, str):
@@ -255,9 +248,8 @@ def get_sales_date_range() -> Tuple[datetime, datetime]:
 def check_database_connection() -> bool:
     """Check if database connection is available."""
     try:
-        db_url = get_database_url()
-        conn = psycopg2.connect(db_url)
-        conn.close()
+        with get_engine().connect():
+            pass
         return True
     except Exception:
         return False
@@ -265,13 +257,11 @@ def check_database_connection() -> bool:
 
 def load_sales_data_to_db(clear: bool = False, source: str = "templates_data") -> None:
     """Load sales data to database."""
-    db_url = get_database_url()
-    engine = create_engine(db_url)
+    engine = get_engine()
 
     if clear:
-        with engine.connect() as conn:
+        with engine.begin() as conn:
             conn.execute(text("DROP TABLE IF EXISTS sales"))
-            conn.commit()
 
     df = pd.read_excel(get_excel_file_path("sales_template.xlsx", source))
     df.to_sql("sales", engine, if_exists="replace", index=False)
@@ -279,13 +269,11 @@ def load_sales_data_to_db(clear: bool = False, source: str = "templates_data") -
 
 def load_promotion_costs_to_db(clear: bool = False, source: str = "templates_data") -> None:
     """Load promotion costs data to database."""
-    db_url = get_database_url()
-    engine = create_engine(db_url)
+    engine = get_engine()
 
     if clear:
-        with engine.connect() as conn:
+        with engine.begin() as conn:
             conn.execute(text("DROP TABLE IF EXISTS promotion_costs"))
-            conn.commit()
 
     df = pd.read_excel(get_excel_file_path("promotion_costs_template.xlsx", source))
     df.to_sql("promotion_costs", engine, if_exists="replace", index=False)
@@ -293,13 +281,11 @@ def load_promotion_costs_to_db(clear: bool = False, source: str = "templates_dat
 
 def load_other_marketing_costs_to_db(clear: bool = False, source: str = "templates_data") -> None:
     """Load other marketing costs data to database."""
-    db_url = get_database_url()
-    engine = create_engine(db_url)
+    engine = get_engine()
 
     if clear:
-        with engine.connect() as conn:
+        with engine.begin() as conn:
             conn.execute(text("DROP TABLE IF EXISTS other_marketing_costs"))
-            conn.commit()
 
     df = pd.read_excel(get_excel_file_path("other_marketing_costs_template.xlsx", source))
     df.to_sql("other_marketing_costs", engine, if_exists="replace", index=False)
@@ -326,13 +312,11 @@ def save_uploaded_data(uploaded_file) -> None:
 
 def load_custom_sales_to_db(uploaded_file) -> None:
     """Load custom sales data to database."""
-    db_url = get_database_url()
-    engine = create_engine(db_url)
-    
-    with engine.connect() as conn:
+    engine = get_engine()
+
+    with engine.begin() as conn:
         conn.execute(text("DROP TABLE IF EXISTS clients"))
-        conn.commit()
-    
+
     df = pd.read_excel(uploaded_file)
     df.to_excel(get_download_data_path("sales_template.xlsx"), index=False)
     load_sales_data_to_db(clear=True, source="download_data")
@@ -374,21 +358,17 @@ def load_custom_other_marketing_costs_to_db(uploaded_file) -> None:
 def load_promotion_costs_from_db() -> pd.DataFrame:
     """Load promotion costs data from PostgreSQL database."""
     try:
-        db_url = get_database_url()
-        conn = psycopg2.connect(db_url)
-        cursor = conn.cursor()
-        cursor.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'promotion_costs')")
-        table_exists = cursor.fetchone()[0]
-        cursor.close()
-        conn.close()
+        engine = get_engine()
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'promotion_costs')")
+            )
+            table_exists = result.scalar()
 
         if not table_exists:
             return load_promotion_costs_data()
 
-        conn = psycopg2.connect(db_url)
-        df = pd.read_sql("SELECT * FROM promotion_costs", conn)
-        conn.close()
-        return df
+        return pd.read_sql("SELECT * FROM promotion_costs", engine)
     except Exception:
         return load_promotion_costs_data()
 
@@ -397,52 +377,42 @@ def load_promotion_costs_from_db() -> pd.DataFrame:
 def load_other_marketing_costs_from_db() -> pd.DataFrame:
     """Load other marketing costs data from PostgreSQL database."""
     try:
-        db_url = get_database_url()
-        conn = psycopg2.connect(db_url)
-        cursor = conn.cursor()
-        cursor.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'other_marketing_costs')")
-        table_exists = cursor.fetchone()[0]
-        cursor.close()
-        conn.close()
+        engine = get_engine()
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'other_marketing_costs')")
+            )
+            table_exists = result.scalar()
 
         if not table_exists:
             return load_other_marketing_costs_data()
 
-        conn = psycopg2.connect(db_url)
-        df = pd.read_sql("SELECT * FROM other_marketing_costs", conn)
-        conn.close()
-        return df
+        return pd.read_sql("SELECT * FROM other_marketing_costs", engine)
     except Exception:
         return load_other_marketing_costs_data()
 
 
 def create_clients_table() -> None:
     """Create clients table in PostgreSQL."""
-    db_url = get_database_url()
-    conn = psycopg2.connect(db_url)
-    cur = conn.cursor()
-    
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS clients (
-            client_id BIGINT PRIMARY KEY,
-            num_orders INTEGER,
-            first_order_date DATE,
-            last_order_date DATE,
-            total_amount NUMERIC,
-            first_order_id BIGINT,
-            first_order_channel VARCHAR,
-            cohort VARCHAR
-        )
-    """)
-    conn.commit()
-    cur.close()
-    conn.close()
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS clients (
+                client_id BIGINT PRIMARY KEY,
+                num_orders INTEGER,
+                first_order_date DATE,
+                last_order_date DATE,
+                total_amount NUMERIC,
+                first_order_id BIGINT,
+                first_order_channel VARCHAR,
+                cohort VARCHAR
+            )
+        """))
 
 
 def add_cohort_to_sales() -> None:
     """Add cohort column to sales table if not exists and populate it."""
-    db_url = get_database_url()
-    engine = create_engine(db_url)
+    engine = get_engine()
 
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS cohort VARCHAR"))
@@ -467,8 +437,7 @@ def add_cohort_to_sales() -> None:
 
 def add_cohort_to_expenses_tables() -> None:
     """Add cohort column to promotion_costs and other_marketing_costs tables."""
-    db_url = get_database_url()
-    engine = create_engine(db_url)
+    engine = get_engine()
 
     tables = ["promotion_costs", "other_marketing_costs"]
 
@@ -485,7 +454,7 @@ def add_cohort_to_expenses_tables() -> None:
     cohorts_df["date_end"] = pd.to_datetime(cohorts_df["date_end"])
 
     for table in tables:
-        df = pd.read_sql(f"SELECT * FROM {table}", db_url)
+        df = pd.read_sql(f"SELECT * FROM {table}", engine)
         if df.empty:
             continue
 
@@ -504,61 +473,59 @@ def add_cohort_to_expenses_tables() -> None:
 def save_clients_data(df: pd.DataFrame) -> None:
     """Save clients data to PostgreSQL."""
     create_clients_table()
-    db_url = get_database_url()
-    engine = create_engine(db_url)
+    engine = get_engine()
     df.to_sql("clients", engine, if_exists="replace", index=False)
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_clients_from_db() -> pd.DataFrame:
     """Load clients data from PostgreSQL."""
-    db_url = get_database_url()
-    conn = psycopg2.connect(db_url)
-    cur = conn.cursor()
-    cur.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'clients')")
-    table_exists = cur.fetchone()[0]
-    conn.close()
-    
+    engine = get_engine()
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'clients')")
+        )
+        table_exists = result.scalar()
+
     if not table_exists:
         return pd.DataFrame()
-    
-    df = pd.read_sql("SELECT * FROM clients", db_url)
-    return df
+
+    return pd.read_sql("SELECT * FROM clients", engine)
 
 
 def populate_clients_from_sales() -> None:
     """Populate clients table with unique customer IDs from sales."""
     sales_df = load_sales_from_db()
-    
+
     if sales_df.empty or "Customer ID" not in sales_df.columns:
         return
-    
+
     import cohorts as coh
-    
+
     sales_df_copy = sales_df.copy()
     if "order_id" not in sales_df_copy.columns:
         sales_df_copy["order_id"] = range(1, len(sales_df_copy) + 1)
-    
+
     client_stats = sales_df_copy.groupby("Customer ID").agg(
         num_orders=("Customer ID", "count"),
         first_order_date=("Date", "min"),
         last_order_date=("Date", "max"),
         total_amount=("Revenue", "sum")
     ).reset_index()
-    
+
     first_orders = sales_df_copy.sort_values(["Date", "order_id"]).groupby("Customer ID").first().reset_index()
     first_orders = first_orders[["Customer ID", "order_id", "acquisition_channel"]]
     first_orders = first_orders.rename(columns={"order_id": "first_order_id"})
-    
+
     client_data = client_stats.merge(first_orders, on="Customer ID", how="left")
     client_data = client_data.rename(columns={
         "Customer ID": "client_id",
         "acquisition_channel": "first_order_channel"
     })
-    
+
     client_data["first_order_date"] = pd.to_datetime(client_data["first_order_date"]).dt.strftime('%Y-%m-%d')
     client_data["last_order_date"] = pd.to_datetime(client_data["last_order_date"]).dt.strftime('%Y-%m-%d')
-    
+
     min_date = sales_df["Date"].min()
     max_date = sales_df["Date"].max()
     num_cohorts = 8
@@ -568,7 +535,7 @@ def populate_clients_from_sales() -> None:
         cohort_type=coh.COHORT_TYPE_MONTHS,
         num_cohorts=num_cohorts
     )
-    
+
     def get_cohort(date_str):
         if pd.isna(date_str):
             return ""
@@ -580,9 +547,9 @@ def populate_clients_from_sales() -> None:
             else:
                 return f"Cohort {i + 1}"
         return ""
-    
+
     client_data["cohort"] = client_data["first_order_date"].apply(get_cohort)
-    
+
     save_clients_data(client_data)
     add_cohort_to_sales()
     add_cohort_to_expenses_tables()
@@ -590,20 +557,15 @@ def populate_clients_from_sales() -> None:
 
 def create_cohorts_table() -> None:
     """Create cohorts table in PostgreSQL."""
-    db_url = get_database_url()
-    conn = psycopg2.connect(db_url)
-    cur = conn.cursor()
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS cohorts (
-            cohort VARCHAR PRIMARY KEY,
-            date_start DATE,
-            date_end DATE
-        )
-    """)
-    conn.commit()
-    cur.close()
-    conn.close()
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS cohorts (
+                cohort VARCHAR PRIMARY KEY,
+                date_start DATE,
+                date_end DATE
+            )
+        """))
 
 
 def update_cohorts_in_db(start_date: datetime, end_date: datetime,
@@ -611,8 +573,6 @@ def update_cohorts_in_db(start_date: datetime, end_date: datetime,
                           num_cohorts: int, calculation_mode: str = "Cohort Size") -> None:
     """Update cohorts table in PostgreSQL based on parameters."""
     import cohorts as coh
-
-    
 
     if calculation_mode == "Cohort Size":
         _, cohort_dates = coh.recalculate_from_cohort_size(
@@ -643,33 +603,27 @@ def update_cohorts_in_db(start_date: datetime, end_date: datetime,
             "date_end": ce.strftime('%Y-%m-%d')
         })
 
-    db_url = get_database_url()
-    conn = psycopg2.connect(db_url)
-    conn.autocommit = True
-    cur = conn.cursor()
-    cur.execute("DELETE FROM cohorts")
-
-    for row in cohorts_data:
-        cur.execute(
-            "INSERT INTO cohorts (cohort, date_start, date_end) VALUES (%s, %s, %s)",
-            (row["cohort"], row["date_start"], row["date_end"])
-        )
-
-    cur.close()
-    conn.close()
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM cohorts"))
+        for row in cohorts_data:
+            conn.execute(
+                text("INSERT INTO cohorts (cohort, date_start, date_end) VALUES (:cohort, :date_start, :date_end)"),
+                row
+            )
 
 
 def populate_cohorts_table() -> None:
     """Populate cohorts table based on cohort calculations."""
     import cohorts as coh
-    
+
     sales_df = load_sales_from_db()
     if sales_df.empty:
         return
-    
+
     min_date = sales_df["Date"].min()
     max_date = sales_df["Date"].max()
-    
+
     num_cohorts = 8
     _, cohort_dates = coh.recalculate_from_num_cohorts(
         start_date=min_date,
@@ -677,7 +631,7 @@ def populate_cohorts_table() -> None:
         cohort_type=coh.COHORT_TYPE_MONTHS,
         num_cohorts=num_cohorts
     )
-    
+
     cohorts_data = []
     for i, start_date in enumerate(cohort_dates):
         if i < len(cohort_dates) - 1:
@@ -689,41 +643,31 @@ def populate_cohorts_table() -> None:
             "date_start": start_date.strftime('%Y-%m-%d'),
             "date_end": end_date.strftime('%Y-%m-%d')
         })
-    
-    db_url = get_database_url()
-    conn = psycopg2.connect(db_url)
-    conn.autocommit = True
-    cur = conn.cursor()
-    cur.execute("DELETE FROM cohorts")
 
-    for row in cohorts_data:
-        cur.execute(
-            "INSERT INTO cohorts (cohort, date_start, date_end) VALUES (%s, %s, %s)",
-            (row["cohort"], row["date_start"], row["date_end"])
-        )
-
-    cur.close()
-    conn.close()
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM cohorts"))
+        for row in cohorts_data:
+            conn.execute(
+                text("INSERT INTO cohorts (cohort, date_start, date_end) VALUES (:cohort, :date_start, :date_end)"),
+                row
+            )
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_cohorts_from_db() -> pd.DataFrame:
     """Load cohorts data from PostgreSQL."""
-    db_url = get_database_url()
-    conn = psycopg2.connect(db_url)
-    conn.autocommit = True
-    cur = conn.cursor()
-    cur.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'cohorts')")
-    table_exists = cur.fetchone()[0]
+    engine = get_engine()
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'cohorts')")
+        )
+        table_exists = result.scalar()
 
     if not table_exists:
-        conn.close()
         return pd.DataFrame()
 
-    cur.close()
-
-    df = pd.read_sql("SELECT * FROM cohorts ORDER BY date_start", conn)
-    conn.close()
+    df = pd.read_sql("SELECT * FROM cohorts ORDER BY date_start", engine)
     if not df.empty:
         for col in ["date_start", "date_end"]:
             if col in df.columns:
