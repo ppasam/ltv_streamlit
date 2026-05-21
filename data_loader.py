@@ -85,6 +85,23 @@ def migrate_database_schema() -> None:
         except Exception:
             pass
 
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_sales_client_id ON sales(client_id)",
+        "CREATE INDEX IF NOT EXISTS idx_sales_cohort ON sales(cohort)",
+        "CREATE INDEX IF NOT EXISTS idx_sales_purchase_date ON sales(purchase_date)",
+        "CREATE INDEX IF NOT EXISTS idx_clients_cohort ON clients(cohort)",
+        "CREATE INDEX IF NOT EXISTS idx_clients_first_order_date ON clients(first_order_date)",
+        "CREATE INDEX IF NOT EXISTS idx_clients_last_order_date ON clients(last_order_date)",
+        "CREATE INDEX IF NOT EXISTS idx_promotion_costs_cohort ON promotion_costs(cohort)",
+        "CREATE INDEX IF NOT EXISTS idx_other_marketing_costs_cohort ON other_marketing_costs(cohort)",
+    ]
+    for sql in indexes:
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(sql))
+        except Exception:
+            pass
+
 
 def get_current_data_source() -> dict:
     """Check which data source is currently loaded in PostgreSQL."""
@@ -126,6 +143,15 @@ def create_sales_table() -> None:
                 cohort VARCHAR(50)
             )
         """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_sales_client_id ON sales(client_id)
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_sales_cohort ON sales(cohort)
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_sales_purchase_date ON sales(purchase_date)
+        """))
 
 
 def create_promotion_costs_table() -> None:
@@ -140,6 +166,9 @@ def create_promotion_costs_table() -> None:
                 cohort VARCHAR(50)
             )
         """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_promotion_costs_cohort ON promotion_costs(cohort)
+        """))
 
 
 def create_other_marketing_costs_table() -> None:
@@ -153,6 +182,9 @@ def create_other_marketing_costs_table() -> None:
                 costs NUMERIC(10,2),
                 cohort VARCHAR(50)
             )
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_other_marketing_costs_cohort ON other_marketing_costs(cohort)
         """))
 
 
@@ -171,6 +203,15 @@ def create_clients_table() -> None:
                 first_order_channel VARCHAR(255),
                 cohort VARCHAR(50)
             )
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_clients_cohort ON clients(cohort)
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_clients_first_order_date ON clients(first_order_date)
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_clients_last_order_date ON clients(last_order_date)
         """))
 
 
