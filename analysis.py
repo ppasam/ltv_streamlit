@@ -257,76 +257,29 @@ def calculate_avg_profit_per_order_table(profit_table: pd.DataFrame, orders_tabl
     return result
 
 
+def _build_channel_summary(df: pd.DataFrame) -> pd.DataFrame:
+    """Build a channel summary table with Сумма and Доля columns."""
+    if df.empty or "ВСЕГО" not in df.columns:
+        return pd.DataFrame()
+    channels = [idx for idx in df.index if idx != "ИТОГО"]
+    values = [df.loc[c, "ВСЕГО"] for c in channels]
+    total = sum(values)
+    rows = []
+    for ch, v in zip(channels, values):
+        share = round((v / total) * 100, 2) if total else 0
+        rows.append({"Канал": ch, "Сумма": v, "Доля": f"{share}%"})
+    rows.append({"Канал": "ИТОГО", "Сумма": total, "Доля": "100%"})
+    return pd.DataFrame(rows)
+
+
 def calculate_profit_by_channel_table(profit_table: pd.DataFrame) -> pd.DataFrame:
     """Calculate profit by channel with share percentage."""
-    if profit_table.empty:
-        return pd.DataFrame()
-    
-    if "ВСЕГО" not in profit_table.columns:
-        return pd.DataFrame()
-    
-    channels = [idx for idx in profit_table.index if idx != "ИТОГО"]
-    
-    profit_values = []
-    for channel in channels:
-        profit_val = profit_table.loc[channel, "ВСЕГО"] if "ВСЕГО" in profit_table.columns else 0
-        profit_values.append(profit_val)
-    
-    total_profit = sum(profit_values)
-    
-    table_data = []
-    for i, channel in enumerate(channels):
-        profit_val = profit_values[i]
-        share = round((profit_val / total_profit) * 100, 2) if total_profit != 0 else 0
-        table_data.append({
-            "Канал": channel,
-            "Сумма": profit_val,
-            "Доля": f"{share}%"
-        })
-    
-    table_data.append({
-        "Канал": "ИТОГО",
-        "Сумма": total_profit,
-        "Доля": "100%"
-    })
-    
-    return pd.DataFrame(table_data)
+    return _build_channel_summary(profit_table)
 
 
 def calculate_orders_by_channel_table(orders_table: pd.DataFrame) -> pd.DataFrame:
     """Calculate number of orders by channel with sum and share percentage."""
-    if orders_table.empty:
-        return pd.DataFrame()
-    
-    if "ВСЕГО" not in orders_table.columns:
-        return pd.DataFrame()
-    
-    channels = [idx for idx in orders_table.index if idx != "ИТОГО"]
-    
-    orders_values = []
-    for channel in channels:
-        orders_val = orders_table.loc[channel, "ВСЕГО"] if "ВСЕГО" in orders_table.columns else 0
-        orders_values.append(orders_val)
-    
-    total_orders = sum(orders_values)
-    
-    table_data = []
-    for i, channel in enumerate(channels):
-        orders_val = orders_values[i]
-        share = round((orders_val / total_orders) * 100, 2) if total_orders != 0 else 0
-        table_data.append({
-            "Канал": channel,
-            "Сумма": orders_val,
-            "Доля": f"{share}%"
-        })
-    
-    table_data.append({
-        "Канал": "ИТОГО",
-        "Сумма": total_orders,
-        "Доля": "100%"
-    })
-    
-    return pd.DataFrame(table_data)
+    return _build_channel_summary(orders_table)
 
 
 def calculate_avg_profit_by_channel_table(profit_by_channel_df: pd.DataFrame, orders_by_channel_df: pd.DataFrame) -> pd.DataFrame:
