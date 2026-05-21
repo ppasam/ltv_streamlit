@@ -1,8 +1,102 @@
 """Analysis module for LTV data analysis."""
-from datetime import datetime
-from typing import Optional
-
 import pandas as pd
+
+
+def _prepare_cohorts(cohorts_df: pd.DataFrame) -> pd.DataFrame:
+    """Sort cohorts and ensure date columns are datetime."""
+    df = cohorts_df.sort_values("date_start").copy()
+    for col in ["date_start", "date_end"]:
+        if col in df.columns and not pd.api.types.is_datetime64_any_dtype(df[col]):
+            df[col] = pd.to_datetime(df[col])
+    return df
+
+
+def _add_totals_row(df: pd.DataFrame) -> pd.DataFrame:
+    """Append an ИТОГО row to the DataFrame."""
+    totals = df.sum(numeric_only=True)
+    totals.name = "ИТОГО"
+    return pd.concat([df, totals.to_frame().T])
+
+
+def _build_sales_cohort_pivot(
+    sales_df: pd.DataFrame,
+    cohorts_df: pd.DataFrame,
+    value_column: str,
+    agg: str = "sum"
+) -> pd.DataFrame:
+    """Build a channel × cohort pivot table from sales data (revenue/cost/orders)."""
+    if sales_df.empty or cohorts_df.empty:
+        return pd.DataFrame()
+    if "Date" not in sales_df.columns or "acquisition_channel" not in sales_df.columns:
+        return pd.DataFrame()
+    if value_column not in sales_df.columns:
+        return pd.DataFrame()
+
+    if "cohort" in sales_df.columns:
+        sales_df = sales_df[sales_df["cohort"] != ""]
+
+    sales_df = sales_df.copy()
+    if not pd.api.types.is_datetime64_any_dtype(sales_df["Date"]):
+        sales_df["Date"] = pd.to_datetime(sales_df["Date"])
+
+    cohorts_sorted = _prepare_cohorts(cohorts_df)
+    channels = sorted(sales_df["acquisition_channel"].dropna().unique())
+
+    table_data = {}
+    for channel in channels:
+        channel_sales = sales_df[sales_df["acquisition_channel"] == channel]
+        row_data = {}
+        for _, coh_row in cohorts_sorted.iterrows():
+            col_header = coh_row["date_end"].strftime('%Y-%m-%d')
+            mask = (
+                (channel_sales["Date"] >= coh_row["date_start"]) &
+                (channel_sales["Date"] <= coh_row["date_end"])
+            )
+            if agg == "sum":
+                row_data[col_header] = channel_sales.loc[mask, value_column].sum()
+            else:
+                row_data[col_header] = mask.sum()
+        row_data["ВСЕГО"] = sum(row_data.values())
+        table_data[channel] = row_data
+
+    if not table_data:
+        return pd.DataFrame()
+
+    result = pd.DataFrame(table_data).T
+    return _add_totals_row(result)
+
+
+def _build_expense_cohort_pivot(
+    expense_df: pd.DataFrame,
+    cohorts_df: pd.DataFrame
+) -> pd.DataFrame:
+    """Build a channel × cohort pivot from expense data (promotion/marketing)."""
+    if expense_df.empty or "cohort" not in expense_df.columns:
+        return pd.DataFrame()
+
+    expense_df = expense_df[expense_df["cohort"] != ""]
+    if expense_df.empty or "costs" not in expense_df.columns:
+        return pd.DataFrame()
+
+    cohorts_sorted = _prepare_cohorts(cohorts_df)
+    channels = sorted(expense_df["channels"].dropna().unique())
+
+    table_data = {}
+    for channel in channels:
+        channel_costs = expense_df[expense_df["channels"] == channel]
+        row_data = {}
+        for _, coh_row in cohorts_sorted.iterrows():
+            col_header = coh_row["date_end"].strftime('%Y-%m-%d')
+            cohort_costs = channel_costs[channel_costs["cohort"] == coh_row["cohort"]]
+            row_data[col_header] = cohort_costs["costs"].sum()
+        row_data["ВСЕГО"] = sum(row_data.values())
+        table_data[channel] = row_data
+
+    if not table_data:
+        return pd.DataFrame()
+
+    result = pd.DataFrame(table_data).T
+    return _add_totals_row(result)
 
 
 def calculate_overall_metrics(
@@ -86,192 +180,22 @@ def calculate_overall_metrics(
 
 def calculate_revenue_table(sales_df: pd.DataFrame, cohorts_df: pd.DataFrame) -> pd.DataFrame:
     """Calculate revenue table by channel and cohort date range."""
-    if sales_df.empty or cohorts_df.empty:
-        return pd.DataFrame()
-
-    if "Date" not in sales_df.columns or "Revenue" not in sales_df.columns:
-        return pd.DataFrame()
-
-    if "acquisition_channel" not in sales_df.columns:
-        return pd.DataFrame()
-
-    if "cohort" in sales_df.columns:
-        sales_df = sales_df[sales_df["cohort"] != ""]
-
-    sales_df = sales_df.copy()
-    if not pd.api.types.is_datetime64_any_dtype(sales_df["Date"]):
-        sales_df["Date"] = pd.to_datetime(sales_df["Date"])
-    
-    cohorts_sorted = cohorts_df.sort_values("date_start")
-    cohorts_sorted = cohorts_sorted.copy()
-    cohorts_sorted["date_start"] = pd.to_datetime(cohorts_sorted["date_start"])
-    cohorts_sorted["date_end"] = pd.to_datetime(cohorts_sorted["date_end"])
-    
-    channels = sorted(sales_df["acquisition_channel"].dropna().unique())
-    
-    table_data = {}
-    for channel in channels:
-        channel_sales = sales_df[sales_df["acquisition_channel"] == channel]
-        row_data = {}
-        for _, coh_row in cohorts_sorted.iterrows():
-            date_start = coh_row["date_start"]
-            date_end = coh_row["date_end"]
-            col_header = date_end.strftime('%Y-%m-%d') if hasattr(date_end, 'strftime') else str(date_end)
-            
-            cohort_sales = channel_sales[(channel_sales["Date"] >= date_start) & (channel_sales["Date"] <= date_end)]
-            row_data[col_header] = cohort_sales["Revenue"].sum()
-        
-        row_data["ВСЕГО"] = sum(row_data.values())
-        table_data[channel] = row_data
-    
-    if not table_data:
-        return pd.DataFrame()
-    
-    revenue_df = pd.DataFrame(table_data).T
-    
-    totals_row = revenue_df.sum()
-    totals_row.name = "ИТОГО"
-    revenue_df = pd.concat([revenue_df, totals_row.to_frame().T])
-    
-    return revenue_df
+    return _build_sales_cohort_pivot(sales_df, cohorts_df, "Revenue")
 
 
 def calculate_cost_table(sales_df: pd.DataFrame, cohorts_df: pd.DataFrame) -> pd.DataFrame:
     """Calculate cost table by channel and cohort date range."""
-    if sales_df.empty or cohorts_df.empty:
-        return pd.DataFrame()
-
-    if "Date" not in sales_df.columns or "cost" not in sales_df.columns:
-        return pd.DataFrame()
-
-    if "acquisition_channel" not in sales_df.columns:
-        return pd.DataFrame()
-
-    if "cohort" in sales_df.columns:
-        sales_df = sales_df[sales_df["cohort"] != ""]
-
-    sales_df = sales_df.copy()
-    if not pd.api.types.is_datetime64_any_dtype(sales_df["Date"]):
-        sales_df["Date"] = pd.to_datetime(sales_df["Date"])
-    
-    cohorts_sorted = cohorts_df.sort_values("date_start")
-    cohorts_sorted = cohorts_sorted.copy()
-    cohorts_sorted["date_start"] = pd.to_datetime(cohorts_sorted["date_start"])
-    cohorts_sorted["date_end"] = pd.to_datetime(cohorts_sorted["date_end"])
-    
-    channels = sorted(sales_df["acquisition_channel"].dropna().unique())
-    
-    table_data = {}
-    for channel in channels:
-        channel_sales = sales_df[sales_df["acquisition_channel"] == channel]
-        row_data = {}
-        for _, coh_row in cohorts_sorted.iterrows():
-            date_start = coh_row["date_start"]
-            date_end = coh_row["date_end"]
-            col_header = date_end.strftime('%Y-%m-%d') if hasattr(date_end, 'strftime') else str(date_end)
-            
-            cohort_sales = channel_sales[(channel_sales["Date"] >= date_start) & (channel_sales["Date"] <= date_end)]
-            row_data[col_header] = cohort_sales["cost"].sum()
-        
-        row_data["ВСЕГО"] = sum(row_data.values())
-        table_data[channel] = row_data
-    
-    if not table_data:
-        return pd.DataFrame()
-    
-    cost_df = pd.DataFrame(table_data).T
-    
-    totals_row = cost_df.sum()
-    totals_row.name = "ИТОГО"
-    cost_df = pd.concat([cost_df, totals_row.to_frame().T])
-    
-    return cost_df
+    return _build_sales_cohort_pivot(sales_df, cohorts_df, "cost")
 
 
 def calculate_promotion_costs_table(promotion_df: pd.DataFrame, cohorts_df: pd.DataFrame) -> pd.DataFrame:
     """Calculate promotion costs table by channel and cohort."""
-    if promotion_df.empty or "cohort" not in promotion_df.columns:
-        return pd.DataFrame()
-    
-    promotion_with_cohort = promotion_df[promotion_df["cohort"] != ""]
-    
-    if promotion_with_cohort.empty:
-        return pd.DataFrame()
-    
-    if "costs" not in promotion_with_cohort.columns:
-        return pd.DataFrame()
-    
-    cohorts_sorted = cohorts_df.sort_values("date_start")
-    channels = sorted(promotion_with_cohort["channels"].dropna().unique())
-    
-    table_data = {}
-    for channel in channels:
-        channel_costs = promotion_with_cohort[promotion_with_cohort["channels"] == channel]
-        row_data = {}
-        for _, coh_row in cohorts_sorted.iterrows():
-            cohort_name = coh_row["cohort"]
-            date_end = coh_row["date_end"]
-            col_header = date_end.strftime('%Y-%m-%d') if hasattr(date_end, 'strftime') else str(date_end)
-            
-            cohort_costs = channel_costs[channel_costs["cohort"] == cohort_name]
-            row_data[col_header] = cohort_costs["costs"].sum()
-        
-        row_data["ВСЕГО"] = sum(row_data.values())
-        table_data[channel] = row_data
-    
-    if not table_data:
-        return pd.DataFrame()
-    
-    promotion_df_result = pd.DataFrame(table_data).T
-    
-    totals_row = promotion_df_result.sum()
-    totals_row.name = "ИТОГО"
-    promotion_df_result = pd.concat([promotion_df_result, totals_row.to_frame().T])
-    
-    return promotion_df_result
+    return _build_expense_cohort_pivot(promotion_df, cohorts_df)
 
 
 def calculate_other_marketing_costs_table(marketing_df: pd.DataFrame, cohorts_df: pd.DataFrame) -> pd.DataFrame:
     """Calculate other marketing costs table by channel and cohort."""
-    if marketing_df.empty or "cohort" not in marketing_df.columns:
-        return pd.DataFrame()
-    
-    marketing_with_cohort = marketing_df[marketing_df["cohort"] != ""]
-    
-    if marketing_with_cohort.empty:
-        return pd.DataFrame()
-    
-    if "costs" not in marketing_with_cohort.columns:
-        return pd.DataFrame()
-    
-    cohorts_sorted = cohorts_df.sort_values("date_start")
-    channels = sorted(marketing_with_cohort["channels"].dropna().unique())
-    
-    table_data = {}
-    for channel in channels:
-        channel_costs = marketing_with_cohort[marketing_with_cohort["channels"] == channel]
-        row_data = {}
-        for _, coh_row in cohorts_sorted.iterrows():
-            cohort_name = coh_row["cohort"]
-            date_end = coh_row["date_end"]
-            col_header = date_end.strftime('%Y-%m-%d') if hasattr(date_end, 'strftime') else str(date_end)
-            
-            cohort_costs = channel_costs[channel_costs["cohort"] == cohort_name]
-            row_data[col_header] = cohort_costs["costs"].sum()
-        
-        row_data["ВСЕГО"] = sum(row_data.values())
-        table_data[channel] = row_data
-    
-    if not table_data:
-        return pd.DataFrame()
-    
-    marketing_df_result = pd.DataFrame(table_data).T
-    
-    totals_row = marketing_df_result.sum()
-    totals_row.name = "ИТОГО"
-    marketing_df_result = pd.concat([marketing_df_result, totals_row.to_frame().T])
-    
-    return marketing_df_result
+    return _build_expense_cohort_pivot(marketing_df, cohorts_df)
 
 
 def calculate_profit_table(revenue_df: pd.DataFrame, cost_df: pd.DataFrame, 
@@ -310,54 +234,7 @@ def calculate_profit_table(revenue_df: pd.DataFrame, cost_df: pd.DataFrame,
 
 def calculate_orders_table(sales_df: pd.DataFrame, cohorts_df: pd.DataFrame) -> pd.DataFrame:
     """Calculate number of orders by channel and cohort date range."""
-    if sales_df.empty or cohorts_df.empty:
-        return pd.DataFrame()
-
-    if "Date" not in sales_df.columns:
-        return pd.DataFrame()
-
-    if "acquisition_channel" not in sales_df.columns:
-        return pd.DataFrame()
-
-    if "cohort" in sales_df.columns:
-        sales_df = sales_df[sales_df["cohort"] != ""]
-
-    sales_df = sales_df.copy()
-    if not pd.api.types.is_datetime64_any_dtype(sales_df["Date"]):
-        sales_df["Date"] = pd.to_datetime(sales_df["Date"])
-    
-    cohorts_sorted = cohorts_df.sort_values("date_start")
-    cohorts_sorted = cohorts_sorted.copy()
-    cohorts_sorted["date_start"] = pd.to_datetime(cohorts_sorted["date_start"])
-    cohorts_sorted["date_end"] = pd.to_datetime(cohorts_sorted["date_end"])
-    
-    channels = sorted(sales_df["acquisition_channel"].dropna().unique())
-    
-    table_data = {}
-    for channel in channels:
-        channel_sales = sales_df[sales_df["acquisition_channel"] == channel]
-        row_data = {}
-        for _, coh_row in cohorts_sorted.iterrows():
-            date_start = coh_row["date_start"]
-            date_end = coh_row["date_end"]
-            col_header = date_end.strftime('%Y-%m-%d') if hasattr(date_end, 'strftime') else str(date_end)
-            
-            cohort_sales = channel_sales[(channel_sales["Date"] >= date_start) & (channel_sales["Date"] <= date_end)]
-            row_data[col_header] = cohort_sales.shape[0]
-        
-        row_data["ВСЕГО"] = sum(row_data.values())
-        table_data[channel] = row_data
-    
-    if not table_data:
-        return pd.DataFrame()
-    
-    orders_df = pd.DataFrame(table_data).T
-    
-    totals_row = orders_df.sum()
-    totals_row.name = "ИТОГО"
-    orders_df = pd.concat([orders_df, totals_row.to_frame().T])
-    
-    return orders_df
+    return _build_sales_cohort_pivot(sales_df, cohorts_df, "Date", agg="count")
 
 
 def calculate_avg_profit_per_order_table(profit_table: pd.DataFrame, orders_table: pd.DataFrame) -> pd.DataFrame:

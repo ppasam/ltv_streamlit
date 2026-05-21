@@ -2,8 +2,6 @@
 from datetime import datetime, timedelta
 from typing import List, Tuple
 
-import pandas as pd
-
 
 CohortType = str
 
@@ -79,35 +77,6 @@ def validate_cohort_size(num_cohorts: int) -> int:
     return min(num_cohorts, MAX_COHORTS)
 
 
-def calculate_cohorts(start_date: datetime, end_date: datetime,
-                      cohort_type: CohortType, cohort_size: int,
-                      num_cohorts: int) -> Tuple[int, int, List[datetime]]:
-    """Calculate cohort parameters with validation.
-
-    Returns:
-        Tuple of (validated_num_cohorts, cohort_size, list_of_cohort_start_dates)
-    """
-    total_days = (end_date - start_date).days + 1
-    total_months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month) + 1
-
-    if cohort_type == COHORT_TYPE_DAYS:
-        max_possible_cohorts = total_days // cohort_size if cohort_size > 0 else total_days
-    else:
-        max_possible_cohorts = total_months // cohort_size if cohort_size > 0 else total_months
-
-    validated_num_cohorts = min(num_cohorts, MAX_COHORTS, max_possible_cohorts)
-    if validated_num_cohorts < 1:
-        validated_num_cohorts = 1
-
-    if cohort_type == COHORT_TYPE_DAYS:
-        calculated_size = calculate_cohort_size_days(start_date, end_date, validated_num_cohorts)
-    else:
-        calculated_size = calculate_cohort_size_months(start_date, end_date, validated_num_cohorts)
-
-    cohort_dates = get_cohort_dates(start_date, cohort_type, calculated_size, validated_num_cohorts)
-
-    return validated_num_cohorts, calculated_size, cohort_dates
-
 
 def recalculate_from_num_cohorts(start_date: datetime, end_date: datetime,
                                    cohort_type: CohortType,
@@ -148,22 +117,6 @@ def recalculate_from_cohort_size(start_date: datetime, end_date: datetime,
 
     return num_cohorts, cohort_dates
 
-
-def assign_cohort(df: pd.DataFrame, date_column: str,
-                  cohort_type: CohortType, cohort_size: int) -> pd.DataFrame:
-    """Assign cohort to each record based on date column."""
-    df = df.copy()
-
-    if cohort_type == COHORT_TYPE_DAYS:
-        df["cohort_date"] = df[date_column].apply(
-            lambda x: x - timedelta(days=x.day - 1)
-        )
-    else:
-        df["cohort_date"] = df[date_column].apply(
-            lambda x: x.replace(day=1)
-        )
-
-    return df
 
 
 def render_cohort_settings(start_date: datetime, end_date: datetime, current_mode: str = "Cohort Size"):
