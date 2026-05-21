@@ -16,24 +16,27 @@ from sqlalchemy import create_engine, text
 
 
 def _save_segment_column(clients_df: pd.DataFrame, column: str) -> None:
-    """Batch-save a segment column to the clients table."""
-    if clients_df is None or clients_df.empty or column not in clients_df.columns:
-        return
-    db_url = data_loader.get_database_url()
-    engine = create_engine(db_url)
-    with engine.begin() as conn:
-        conn.execute(text(f"ALTER TABLE clients ADD COLUMN IF NOT EXISTS {column} INTEGER"))
-    seg_map = clients_df[["client_id", column]].dropna()
-    seg_map[column] = seg_map[column].astype(int)
-    seg_map.to_sql("_tmp_seg", engine, if_exists="replace", index=False)
-    with engine.begin() as conn:
-        conn.execute(text(f"""
-            UPDATE clients c
-            SET {column} = t.{column}
-            FROM _tmp_seg t
-            WHERE c.client_id = t.client_id
-        """))
-        conn.execute(text("DROP TABLE IF EXISTS _tmp_seg"))
+    """Batch-save a segment column to the clients table (non-critical)."""
+    try:
+        if clients_df is None or clients_df.empty or column not in clients_df.columns:
+            return
+        db_url = data_loader.get_database_url()
+        engine = create_engine(db_url)
+        with engine.begin() as conn:
+            conn.execute(text(f"ALTER TABLE clients ADD COLUMN IF NOT EXISTS {column} INTEGER"))
+        seg_map = clients_df[["client_id", column]].dropna()
+        seg_map[column] = seg_map[column].astype(int)
+        seg_map.to_sql("_tmp_seg", engine, if_exists="replace", index=False)
+        with engine.begin() as conn:
+            conn.execute(text(f"""
+                UPDATE clients c
+                SET {column} = t.{column}
+                FROM _tmp_seg t
+                WHERE c.client_id = t.client_id
+            """))
+            conn.execute(text("DROP TABLE IF EXISTS _tmp_seg"))
+    except Exception:
+        pass  # Non-critical — segments computed in-memory for current session
 
 
 def render_sidebar(start_date: datetime, end_date: datetime) -> tuple:
@@ -877,6 +880,9 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     st.header("Когортный анализ")
 
     cohorts_df = data_loader.load_cohorts_from_db()
+    for col in ["date_start", "date_end"]:
+        if col in cohorts_df.columns and not pd.api.types.is_datetime64_any_dtype(cohorts_df[col]):
+            cohorts_df[col] = pd.to_datetime(cohorts_df[col])
     clients_df = data_loader.load_clients_from_db()
 
     if not clients_df.empty and "first_order_date" in clients_df.columns:
