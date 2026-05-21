@@ -49,6 +49,13 @@ if "initialized" not in st.session_state:
         cohorts.COHORT_TYPE_MONTHS
     )
 
+    data_loader.load_sales_from_db()
+    data_loader.load_sales_from_db(start_date, end_date)
+    data_loader.load_clients_from_db()
+    data_loader.load_cohorts_from_db()
+    data_loader.load_promotion_costs_from_db()
+    data_loader.load_other_marketing_costs_from_db()
+
 
 def main() -> None:
     """Main application function."""

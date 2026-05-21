@@ -214,7 +214,7 @@ def _load_sales_from_excel(start_date: Optional[datetime] = None,
     return df
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def get_sales_date_range() -> Tuple[datetime, datetime]:
     """Get the min and max dates from sales data."""
     try:
@@ -370,7 +370,7 @@ def load_custom_other_marketing_costs_to_db(uploaded_file) -> None:
     st.cache_data.clear()
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_promotion_costs_from_db() -> pd.DataFrame:
     """Load promotion costs data from PostgreSQL database."""
     try:
@@ -393,7 +393,7 @@ def load_promotion_costs_from_db() -> pd.DataFrame:
         return load_promotion_costs_data()
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_other_marketing_costs_from_db() -> pd.DataFrame:
     """Load other marketing costs data from PostgreSQL database."""
     try:
