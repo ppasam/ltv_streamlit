@@ -62,7 +62,10 @@ Cohort recalculation (`update_cohorts_in_db` + `populate_clients_from_sales`) on
 | File | Responsibility |
 |------|---------------|
 | `app.py` | Session init, sidebar, section routing |
-| `ui.py` | All Streamlit rendering (4 sections: Общий/RFM/Когортный/Загрузка) |
+| `ui_common.py` | Shared UI: `_save_segment_column()`, `render_sidebar()`, `render_data_upload_section()`, `render_section()` |
+| `ui_general.py` | `render_overall_analysis()` (Общий анализ) |
+| `ui_rfm.py` | `render_rfm_analysis()` + `create_financial_counter()` |
+| `ui_cohort.py` | `render_cohort_analysis()` (Когортный анализ + CLV) |
 | `data_loader.py` | DB connection, Excel loading, init, batch writes |
 | `cohorts.py` | Cohort math: date splitting, bidirectional recalculation |
 | `analysis.py` | Pandas calculations for all tables/charts |
