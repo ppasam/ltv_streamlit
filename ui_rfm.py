@@ -7,6 +7,7 @@ import streamlit as st
 
 import data_loader
 
+from analysis import propagate_monetary_values
 from ui_common import _save_segment_column
 
 
@@ -225,42 +226,14 @@ def render_rfm_analysis(start_date: datetime, end_date: datetime) -> None:
 
     vals_m = list(st.session_state.monetary_values_m)
 
-    # Для отслеживания изменений храним предыдущие значения
     prev_vals = st.session_state.get("monetary_prev_values_m", None)
 
-    # Определяем какой счетчик изменился
-    changed_idx = -1
-    if prev_vals is not None:
-        for i in range(3):
-            if vals_m[i] != prev_vals[i]:
-                changed_idx = i
-                break
+    new_vals = propagate_monetary_values(vals_m, prev_vals, max_monetary)
+    if new_vals != vals_m:
+        vals_m = new_vals
+        st.session_state.monetary_values_m = vals_m
+        st.session_state.monetary_prev_values_m = list(vals_m)
 
-    # Если есть изменение - применяем правила распространения
-    if changed_idx >= 0:
-        new_vals = list(vals_m)
-        if new_vals[changed_idx] > prev_vals[changed_idx]:
-            for i in range(changed_idx, 2):
-                required = new_vals[i] + MIN_DIFF
-                if new_vals[i + 1] < required:
-                    new_vals[i + 1] = required
-        else:
-            for i in range(changed_idx, 0, -1):
-                required = new_vals[i] - MIN_DIFF
-                if new_vals[i - 1] > required:
-                    new_vals[i - 1] = required
-
-        # Также корректируем вверх для max_monetary
-        new_vals[2] = min(new_vals[2], max_monetary)
-        new_vals[1] = min(new_vals[1], new_vals[2] - MIN_DIFF)
-        new_vals[0] = min(new_vals[0], new_vals[1] - MIN_DIFF)
-
-        if new_vals != vals_m:
-            vals_m = new_vals
-            st.session_state.monetary_values_m = vals_m
-            st.session_state.monetary_prev_values_m = list(vals_m)
-
-    # Сохраняем текущие значения для следующего рендера
     st.session_state.monetary_prev_values_m = list(vals_m)
 
     # Конвертируем Decimal в float для number_input (только для отображения)

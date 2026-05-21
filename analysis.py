@@ -1,5 +1,9 @@
 """Analysis module for LTV data analysis."""
+from decimal import Decimal
+
 import pandas as pd
+
+MONETARY_MIN_DIFF = Decimal("0.01")
 
 
 def _prepare_cohorts(cohorts_df: pd.DataFrame) -> pd.DataFrame:
@@ -340,5 +344,49 @@ def calculate_avg_acquisition_cost_table(promotion_df: pd.DataFrame, orders_tabl
                 result.loc[idx, col] = promo_val / orders_val
             else:
                 result.loc[idx, col] = 0
-    
+
     return result
+
+
+def propagate_monetary_values(
+    vals_m: list,
+    prev_vals: list,
+    max_monetary: Decimal
+) -> list:
+    """Apply monetary segment propagation rules (M2 < M3 < M4).
+
+    When a segment value changes, adjacent segments are pushed up (if value
+    increased) or pulled down (if value decreased) to maintain MIN_DIFF gaps.
+    All values are clamped to ``max_monetary``.
+
+    Returns a new list of three Decimals.
+    """
+    if prev_vals is None:
+        return list(vals_m)
+
+    changed_idx = -1
+    for i in range(3):
+        if vals_m[i] != prev_vals[i]:
+            changed_idx = i
+            break
+
+    if changed_idx < 0:
+        return list(vals_m)
+
+    new_vals = list(vals_m)
+    if new_vals[changed_idx] > prev_vals[changed_idx]:
+        for i in range(changed_idx, 2):
+            required = new_vals[i] + MONETARY_MIN_DIFF
+            if new_vals[i + 1] < required:
+                new_vals[i + 1] = required
+    else:
+        for i in range(changed_idx, 0, -1):
+            required = new_vals[i] - MONETARY_MIN_DIFF
+            if new_vals[i - 1] > required:
+                new_vals[i - 1] = required
+
+    new_vals[2] = min(new_vals[2], max_monetary)
+    new_vals[1] = min(new_vals[1], new_vals[2] - MONETARY_MIN_DIFF)
+    new_vals[0] = min(new_vals[0], new_vals[1] - MONETARY_MIN_DIFF)
+
+    return new_vals

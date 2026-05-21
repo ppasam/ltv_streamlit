@@ -1,4 +1,6 @@
 """Tests for analysis module."""
+from decimal import Decimal
+
 import pandas as pd
 import pytest
 from datetime import datetime
@@ -16,6 +18,7 @@ from analysis import (
     calculate_avg_acquisition_cost_table,
     calculate_promotion_costs_table,
     calculate_other_marketing_costs_table,
+    propagate_monetary_values,
 )
 
 
@@ -285,3 +288,125 @@ class TestCalculateOtherMarketingCostsTable:
         df = pd.DataFrame({"costs": [50], "channels": ["Organic"]})
         result = calculate_other_marketing_costs_table(df, pd.DataFrame())
         assert result.empty
+
+
+# ── propagate_monetary_values ─────────────────────────────────────────
+
+class TestPropagateMonetaryValues:
+    def test_no_prev_vals_returns_same(self):
+        from analysis import propagate_monetary_values
+        from decimal import Decimal
+        vals = [Decimal("100"), Decimal("200"), Decimal("300")]
+        result = propagate_monetary_values(vals, None, Decimal("1000"))
+        assert result == vals
+
+    def test_no_change_returns_same(self):
+        from analysis import propagate_monetary_values
+        from decimal import Decimal
+        vals = [Decimal("100"), Decimal("200"), Decimal("300")]
+        result = propagate_monetary_values(vals, list(vals), Decimal("1000"))
+        assert result == vals
+
+    def test_push_up_m2(self):
+        from analysis import propagate_monetary_values
+        from decimal import Decimal
+        vals = [Decimal("300"), Decimal("200"), Decimal("300")]
+        prev = [Decimal("100"), Decimal("200"), Decimal("300")]
+        result = propagate_monetary_values(vals, prev, Decimal("1000"))
+        assert result[0] == Decimal("300")
+        assert result[1] >= result[0] + Decimal("0.01")
+        assert result[2] >= result[1] + Decimal("0.01")
+
+    def test_push_up_m3(self):
+        from analysis import propagate_monetary_values
+        from decimal import Decimal
+        vals = [Decimal("100"), Decimal("500"), Decimal("300")]
+        prev = [Decimal("100"), Decimal("200"), Decimal("300")]
+        result = propagate_monetary_values(vals, prev, Decimal("1000"))
+        assert result[1] == Decimal("500")
+        assert result[2] >= result[1] + Decimal("0.01")
+
+    def test_pull_down_m2(self):
+        from analysis import propagate_monetary_values
+        from decimal import Decimal
+        vals = [Decimal("50"), Decimal("200"), Decimal("300")]
+        prev = [Decimal("100"), Decimal("200"), Decimal("300")]
+        result = propagate_monetary_values(vals, prev, Decimal("1000"))
+        assert result[0] == Decimal("50")
+        # M1 doesn't exist, so nothing to pull
+        assert result[1] == Decimal("200")
+
+    def test_pull_down_m3(self):
+        from analysis import propagate_monetary_values
+        from decimal import Decimal
+        vals = [Decimal("100"), Decimal("80"), Decimal("300")]
+        prev = [Decimal("100"), Decimal("200"), Decimal("300")]
+        result = propagate_monetary_values(vals, prev, Decimal("1000"))
+        assert result[1] == Decimal("80")
+        assert result[0] <= result[1] - Decimal("0.01")
+
+    def test_clamp_to_max_monetary(self):
+        from analysis import propagate_monetary_values
+        from decimal import Decimal
+        vals = [Decimal("100"), Decimal("200"), Decimal("300")]
+        prev = [Decimal("100"), Decimal("200"), Decimal("200")]
+        result = propagate_monetary_values(vals, prev, Decimal("250"))
+        assert result[2] == Decimal("250")
+        assert result[1] <= result[2] - Decimal("0.01")
+
+    def test_min_diff_maintained_strictly(self):
+        from analysis import propagate_monetary_values
+        from decimal import Decimal
+        vals = [Decimal("100"), Decimal("200"), Decimal("300")]
+        prev = [Decimal("1"), Decimal("200"), Decimal("300")]
+        result = propagate_monetary_values(vals, prev, Decimal("1000"))
+        assert result[1] - result[0] >= Decimal("0.01")
+        assert result[2] - result[1] >= Decimal("0.01")
+
+
+# ── Additional edge cases ──────────────────────────────────────────────
+
+class TestEdgeCases:
+    def test_overall_metrics_sales_only_no_clients(self):
+        from analysis import calculate_overall_metrics
+        sales = pd.DataFrame({
+            "Revenue": [100, 200],
+            "Cost": [40, 60],
+        })
+        result = calculate_overall_metrics(sales, pd.DataFrame(), pd.DataFrame(), pd.DataFrame())
+        assert not result.empty
+
+    def test_revenue_table_no_revenue_column(self):
+        from analysis import calculate_revenue_table
+        sales = pd.DataFrame({"Date": pd.to_datetime(["2024-01-01"])})
+        cohorts = pd.DataFrame({
+            "cohort": ["Cohort 1"],
+            "date_start": pd.to_datetime(["2024-01-01"]),
+            "date_end": pd.to_datetime(["2024-03-31"]),
+        })
+        result = calculate_revenue_table(sales, cohorts)
+        assert result.empty
+
+    def test_profit_table_empty_all(self):
+        from analysis import calculate_profit_table
+        result = calculate_profit_table(pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame())
+        assert result.empty
+
+    def test_orders_table_with_missing_data(self):
+        from analysis import calculate_orders_table
+        sales = pd.DataFrame({"Date": pd.to_datetime(["2024-01-01"])})
+        cohorts = pd.DataFrame()
+        result = calculate_orders_table(sales, cohorts)
+        assert result.empty
+
+    def test_avg_acquisition_with_zero_orders(self):
+        from analysis import calculate_avg_acquisition_cost_table
+        promo = pd.DataFrame({
+            "cohort": ["Cohort 1"],
+            "date_start": pd.to_datetime(["2024-01-01"]),
+            "date_end": pd.to_datetime(["2024-03-31"]),
+        })
+        orders = pd.DataFrame({"Cohort 1": [0]}, index=["Cohort 1"])
+        result = calculate_avg_acquisition_cost_table(promo, orders)
+        assert not result.empty
+        assert result.iloc[0, 0] == 0
