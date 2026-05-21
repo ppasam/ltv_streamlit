@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 
 import pandas as pd
 import streamlit as st
-from sqlalchemy import create_engine, text
+from sqlalchemy import Date, Numeric, create_engine, text
 
 
 def get_database_url() -> str:
@@ -66,6 +66,26 @@ def check_tables_exist() -> bool:
         return False
 
 
+def migrate_database_schema() -> None:
+    """Migrate existing tables to proper column types (DATE, NUMERIC, etc)."""
+    engine = get_engine()
+    migrations = [
+        "ALTER TABLE clients ALTER COLUMN first_order_date TYPE DATE USING first_order_date::date",
+        "ALTER TABLE clients ALTER COLUMN last_order_date TYPE DATE USING last_order_date::date",
+        "ALTER TABLE clients ALTER COLUMN total_amount TYPE NUMERIC(12,2) USING total_amount::numeric",
+        "ALTER TABLE sales ALTER COLUMN order_price TYPE NUMERIC(10,2) USING order_price::numeric",
+        "ALTER TABLE sales ALTER COLUMN cost TYPE NUMERIC(10,2) USING cost::numeric",
+        "ALTER TABLE promotion_costs ALTER COLUMN costs TYPE NUMERIC(10,2) USING costs::numeric",
+        "ALTER TABLE other_marketing_costs ALTER COLUMN costs TYPE NUMERIC(10,2) USING costs::numeric",
+    ]
+    for sql in migrations:
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(sql))
+        except Exception:
+            pass
+
+
 def get_current_data_source() -> dict:
     """Check which data source is currently loaded in PostgreSQL."""
     download_path = os.path.join("data", "download_data")
@@ -89,6 +109,102 @@ def get_current_data_source() -> dict:
         result["other_marketing_costs"] = "custom"
 
     return result
+
+
+def create_sales_table() -> None:
+    """Create sales table with proper schema if not exists."""
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS sales (
+                purchase_date DATE NOT NULL,
+                order_id BIGINT,
+                order_price NUMERIC(10,2) NOT NULL,
+                cost NUMERIC(10,2),
+                client_id BIGINT NOT NULL,
+                acquisition_channel VARCHAR(255),
+                cohort VARCHAR(50)
+            )
+        """))
+
+
+def create_promotion_costs_table() -> None:
+    """Create promotion_costs table with proper schema if not exists."""
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS promotion_costs (
+                channels VARCHAR(255),
+                expenses_date DATE,
+                costs NUMERIC(10,2),
+                cohort VARCHAR(50)
+            )
+        """))
+
+
+def create_other_marketing_costs_table() -> None:
+    """Create other_marketing_costs table with proper schema if not exists."""
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS other_marketing_costs (
+                channels VARCHAR(255),
+                expenses_date DATE,
+                costs NUMERIC(10,2),
+                cohort VARCHAR(50)
+            )
+        """))
+
+
+def create_clients_table() -> None:
+    """Create clients table with proper schema if not exists."""
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS clients (
+                client_id BIGINT PRIMARY KEY,
+                num_orders INTEGER,
+                first_order_date DATE,
+                last_order_date DATE,
+                total_amount NUMERIC(12,2),
+                first_order_id BIGINT,
+                first_order_channel VARCHAR(255),
+                cohort VARCHAR(50)
+            )
+        """))
+
+
+def create_cohorts_table() -> None:
+    """Create cohorts table with proper schema if not exists."""
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS cohorts (
+                cohort VARCHAR(50) PRIMARY KEY,
+                date_start DATE NOT NULL,
+                date_end DATE NOT NULL
+            )
+        """))
+
+
+_SALES_DTYPE = {
+    "purchase_date": Date(),
+    "order_price": Numeric(10, 2),
+    "cost": Numeric(10, 2),
+}
+_COSTS_DTYPE = {
+    "expenses_date": Date(),
+    "costs": Numeric(10, 2),
+}
+_CLIENTS_DTYPE = {
+    "first_order_date": Date(),
+    "last_order_date": Date(),
+    "total_amount": Numeric(12, 2),
+}
+_COHORTS_DTYPE = {
+    "date_start": Date(),
+    "date_end": Date(),
+}
 
 
 @st.cache_data(ttl=3600)
@@ -152,19 +268,6 @@ def init_database_from_templates() -> None:
         pass
 
 
-def init_database() -> None:
-    """Initialize database and load data from Excel templates."""
-    engine = get_engine()
-
-    sales_df = load_sales_data()
-    promotion_df = load_promotion_costs_data()
-    marketing_df = load_other_marketing_costs_data()
-
-    sales_df.to_sql("sales", engine, if_exists="replace", index=False)
-    promotion_df.to_sql("promotion_costs", engine, if_exists="replace", index=False)
-    marketing_df.to_sql("other_marketing_costs", engine, if_exists="replace", index=False)
-
-
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_sales_from_db(start_date: Optional[datetime] = None,
                        end_date: Optional[datetime] = None) -> pd.DataFrame:
@@ -182,11 +285,22 @@ def load_sales_from_db(start_date: Optional[datetime] = None,
         load_sales_data_to_db(source="templates_data")
         populate_clients_from_sales()
 
-    query = "SELECT purchase_date, order_id, order_price, cost, client_id, acquisition_channel, cohort FROM sales"
     if start_date and end_date:
-        query += f" WHERE purchase_date >= '{start_date.strftime('%Y-%m-%d')}' AND purchase_date <= '{end_date.strftime('%Y-%m-%d')}'"
-
-    raw_df = pd.read_sql(query, engine)
+        raw_df = pd.read_sql(
+            text("""
+                SELECT purchase_date, order_id, order_price, cost,
+                       client_id, acquisition_channel, cohort
+                FROM sales
+                WHERE purchase_date >= :start_date AND purchase_date <= :end_date
+            """),
+            engine,
+            params={"start_date": start_date, "end_date": end_date}
+        )
+    else:
+        raw_df = pd.read_sql(
+            "SELECT purchase_date, order_id, order_price, cost, client_id, acquisition_channel, cohort FROM sales",
+            engine
+        )
 
     df = raw_df.rename(columns={
         "purchase_date": "Date",
@@ -215,23 +329,18 @@ def get_sales_date_range() -> Tuple[datetime, datetime]:
     """Get the min and max dates from sales data."""
     try:
         engine = get_engine()
-        with engine.connect() as conn:
-            result = conn.execute(
-                text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'sales')")
-            )
-            table_exists = result.scalar()
-
-        if table_exists:
-            query = "SELECT MIN(purchase_date) as min_date, MAX(purchase_date) as max_date FROM sales"
-            result_df = pd.read_sql(query, engine)
-            if not result_df.empty:
-                min_date = result_df["min_date"].iloc[0]
-                max_date = result_df["max_date"].iloc[0]
-                if isinstance(min_date, str):
-                    min_date = datetime.strptime(min_date.split(' ')[0], '%Y-%m-%d')
-                if isinstance(max_date, str):
-                    max_date = datetime.strptime(max_date.split(' ')[0], '%Y-%m-%d')
-                return min_date, max_date
+        result_df = pd.read_sql(
+            "SELECT MIN(purchase_date) as min_date, MAX(purchase_date) as max_date FROM sales",
+            engine
+        )
+        if not result_df.empty:
+            min_date = result_df["min_date"].iloc[0]
+            max_date = result_df["max_date"].iloc[0]
+            if isinstance(min_date, str):
+                min_date = datetime.strptime(min_date.split(' ')[0], '%Y-%m-%d')
+            if isinstance(max_date, str):
+                max_date = datetime.strptime(max_date.split(' ')[0], '%Y-%m-%d')
+            return min_date, max_date
     except Exception:
         pass
 
@@ -256,39 +365,45 @@ def check_database_connection() -> bool:
 
 
 def load_sales_data_to_db(clear: bool = False, source: str = "templates_data") -> None:
-    """Load sales data to database."""
+    """Load sales data to database preserving schema."""
     engine = get_engine()
+    create_sales_table()
 
     if clear:
         with engine.begin() as conn:
-            conn.execute(text("DROP TABLE IF EXISTS sales"))
+            conn.execute(text("TRUNCATE TABLE sales"))
 
     df = pd.read_excel(get_excel_file_path("sales_template.xlsx", source))
-    df.to_sql("sales", engine, if_exists="replace", index=False)
+    df["purchase_date"] = pd.to_datetime(df["purchase_date"])
+    df.to_sql("sales", engine, if_exists="append", index=False, dtype=_SALES_DTYPE)
 
 
 def load_promotion_costs_to_db(clear: bool = False, source: str = "templates_data") -> None:
-    """Load promotion costs data to database."""
+    """Load promotion costs data to database preserving schema."""
     engine = get_engine()
+    create_promotion_costs_table()
 
     if clear:
         with engine.begin() as conn:
-            conn.execute(text("DROP TABLE IF EXISTS promotion_costs"))
+            conn.execute(text("TRUNCATE TABLE promotion_costs"))
 
     df = pd.read_excel(get_excel_file_path("promotion_costs_template.xlsx", source))
-    df.to_sql("promotion_costs", engine, if_exists="replace", index=False)
+    df["expenses_date"] = pd.to_datetime(df["expenses_date"])
+    df.to_sql("promotion_costs", engine, if_exists="append", index=False, dtype=_COSTS_DTYPE)
 
 
 def load_other_marketing_costs_to_db(clear: bool = False, source: str = "templates_data") -> None:
-    """Load other marketing costs data to database."""
+    """Load other marketing costs data to database preserving schema."""
     engine = get_engine()
+    create_other_marketing_costs_table()
 
     if clear:
         with engine.begin() as conn:
-            conn.execute(text("DROP TABLE IF EXISTS other_marketing_costs"))
+            conn.execute(text("TRUNCATE TABLE other_marketing_costs"))
 
     df = pd.read_excel(get_excel_file_path("other_marketing_costs_template.xlsx", source))
-    df.to_sql("other_marketing_costs", engine, if_exists="replace", index=False)
+    df["expenses_date"] = pd.to_datetime(df["expenses_date"])
+    df.to_sql("other_marketing_costs", engine, if_exists="append", index=False, dtype=_COSTS_DTYPE)
 
 
 def save_uploaded_data(uploaded_file) -> None:
@@ -392,30 +507,12 @@ def load_other_marketing_costs_from_db() -> pd.DataFrame:
         return load_other_marketing_costs_data()
 
 
-def create_clients_table() -> None:
-    """Create clients table in PostgreSQL."""
-    engine = get_engine()
-    with engine.begin() as conn:
-        conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS clients (
-                client_id BIGINT PRIMARY KEY,
-                num_orders INTEGER,
-                first_order_date DATE,
-                last_order_date DATE,
-                total_amount NUMERIC,
-                first_order_id BIGINT,
-                first_order_channel VARCHAR,
-                cohort VARCHAR
-            )
-        """))
-
-
 def add_cohort_to_sales() -> None:
     """Add cohort column to sales table if not exists and populate it."""
     engine = get_engine()
 
     with engine.begin() as conn:
-        conn.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS cohort VARCHAR"))
+        conn.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS cohort VARCHAR(50)"))
 
     clients_df = load_clients_from_db()
     if clients_df.empty:
@@ -443,7 +540,7 @@ def add_cohort_to_expenses_tables() -> None:
 
     for table in tables:
         with engine.begin() as conn:
-            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS cohort VARCHAR"))
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS cohort VARCHAR(50)"))
 
     cohorts_df = load_cohorts_from_db()
     if cohorts_df.empty:
@@ -467,14 +564,18 @@ def add_cohort_to_expenses_tables() -> None:
             return matching.iloc[0]["cohort"] if not matching.empty else ""
 
         df["cohort"] = df["expenses_date"].apply(assign_cohort)
-        df.to_sql(table, engine, if_exists="replace", index=False)
+        with engine.begin() as conn:
+            conn.execute(text(f"TRUNCATE TABLE {table}"))
+        df.to_sql(table, engine, if_exists="append", index=False, dtype=_COSTS_DTYPE)
 
 
 def save_clients_data(df: pd.DataFrame) -> None:
-    """Save clients data to PostgreSQL."""
+    """Save clients data to PostgreSQL, preserving schema."""
     create_clients_table()
     engine = get_engine()
-    df.to_sql("clients", engine, if_exists="replace", index=False)
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM clients"))
+    df.to_sql("clients", engine, if_exists="append", index=False, dtype=_CLIENTS_DTYPE)
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -523,8 +624,9 @@ def populate_clients_from_sales() -> None:
         "acquisition_channel": "first_order_channel"
     })
 
-    client_data["first_order_date"] = pd.to_datetime(client_data["first_order_date"]).dt.strftime('%Y-%m-%d')
-    client_data["last_order_date"] = pd.to_datetime(client_data["last_order_date"]).dt.strftime('%Y-%m-%d')
+    # Keep as datetime — downstream code handles both str and datetime
+    client_data["first_order_date"] = pd.to_datetime(client_data["first_order_date"])
+    client_data["last_order_date"] = pd.to_datetime(client_data["last_order_date"])
 
     min_date = sales_df["Date"].min()
     max_date = sales_df["Date"].max()
@@ -536,10 +638,9 @@ def populate_clients_from_sales() -> None:
         num_cohorts=num_cohorts
     )
 
-    def get_cohort(date_str):
-        if pd.isna(date_str):
+    def get_cohort(date):
+        if pd.isna(date):
             return ""
-        date = pd.to_datetime(date_str)
         for i, cohort_date in enumerate(cohort_dates):
             if i < len(cohort_dates) - 1:
                 if cohort_date <= date < cohort_dates[i + 1]:
@@ -553,19 +654,6 @@ def populate_clients_from_sales() -> None:
     save_clients_data(client_data)
     add_cohort_to_sales()
     add_cohort_to_expenses_tables()
-
-
-def create_cohorts_table() -> None:
-    """Create cohorts table in PostgreSQL."""
-    engine = get_engine()
-    with engine.begin() as conn:
-        conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS cohorts (
-                cohort VARCHAR PRIMARY KEY,
-                date_start DATE,
-                date_end DATE
-            )
-        """))
 
 
 def update_cohorts_in_db(start_date: datetime, end_date: datetime,
@@ -599,59 +687,17 @@ def update_cohorts_in_db(start_date: datetime, end_date: datetime,
             ce = end_date
         cohorts_data.append({
             "cohort": f"Cohort {i + 1}",
-            "date_start": cs.strftime('%Y-%m-%d'),
-            "date_end": ce.strftime('%Y-%m-%d')
+            "date_start": cs,
+            "date_end": ce
         })
 
     engine = get_engine()
+    create_cohorts_table()
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM cohorts"))
-        for row in cohorts_data:
-            conn.execute(
-                text("INSERT INTO cohorts (cohort, date_start, date_end) VALUES (:cohort, :date_start, :date_end)"),
-                row
-            )
 
-
-def populate_cohorts_table() -> None:
-    """Populate cohorts table based on cohort calculations."""
-    import cohorts as coh
-
-    sales_df = load_sales_from_db()
-    if sales_df.empty:
-        return
-
-    min_date = sales_df["Date"].min()
-    max_date = sales_df["Date"].max()
-
-    num_cohorts = 8
-    _, cohort_dates = coh.recalculate_from_num_cohorts(
-        start_date=min_date,
-        end_date=max_date,
-        cohort_type=coh.COHORT_TYPE_MONTHS,
-        num_cohorts=num_cohorts
-    )
-
-    cohorts_data = []
-    for i, start_date in enumerate(cohort_dates):
-        if i < len(cohort_dates) - 1:
-            end_date = cohort_dates[i + 1] - timedelta(days=1)
-        else:
-            end_date = max_date
-        cohorts_data.append({
-            "cohort": f"Cohort {i + 1}",
-            "date_start": start_date.strftime('%Y-%m-%d'),
-            "date_end": end_date.strftime('%Y-%m-%d')
-        })
-
-    engine = get_engine()
-    with engine.begin() as conn:
-        conn.execute(text("DELETE FROM cohorts"))
-        for row in cohorts_data:
-            conn.execute(
-                text("INSERT INTO cohorts (cohort, date_start, date_end) VALUES (:cohort, :date_start, :date_end)"),
-                row
-            )
+    cohorts_df = pd.DataFrame(cohorts_data)
+    cohorts_df.to_sql("cohorts", engine, if_exists="append", index=False, dtype=_COHORTS_DTYPE)
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -670,6 +716,6 @@ def load_cohorts_from_db() -> pd.DataFrame:
     df = pd.read_sql("SELECT * FROM cohorts ORDER BY date_start", engine)
     if not df.empty:
         for col in ["date_start", "date_end"]:
-            if col in df.columns:
+            if col in df.columns and not pd.api.types.is_datetime64_any_dtype(df[col]):
                 df[col] = pd.to_datetime(df[col])
     return df

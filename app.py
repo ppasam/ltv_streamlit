@@ -35,6 +35,7 @@ if "calculation_mode" not in st.session_state:
 
 if "initialized" not in st.session_state:
     if data_loader.check_tables_exist():
+        data_loader.migrate_database_schema()
         st.session_state.initialized = True
     else:
         data_loader.init_database_from_templates()
