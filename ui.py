@@ -1212,11 +1212,15 @@ def render_cohort_analysis(cohort_dates: list) -> None:
     num_cohorts = len(column_headers)
     for row_idx in range(len(actual_table) - 1):
         k = row_idx + 1
-        x = actual_table[row_idx].get(column_headers[-1], 0)
+        x = _val(actual_table[row_idx], column_headers[-1])
         y = cohort_table[row_idx]["Кол-во клиентов"] if row_idx < len(cohort_table) else 0
         if isinstance(x, (int, float)) and isinstance(y, (int, float)) and y > 0 and k < num_cohorts:
             churn = 1 - (x / y) ** (1 / (num_cohorts - k))
             churn_rate_df.iloc[row_idx, -1] = f"{churn * 100:.2f}%"
+
+    def _val(row, col):
+        v = row.get(col, 0)
+        return v if isinstance(v, (int, float)) else 0
 
     if "ВСЕГО" in churn_rate_df["Когорты"].values:
         for col in churn_rate_df.columns[1:]:
@@ -1224,8 +1228,16 @@ def render_cohort_analysis(cohort_dates: list) -> None:
 
         for period_idx in range(2, len(new_columns)):
             diag_offset = period_idx - 1
-            curr_diag_sum = sum(actual_table[i].get(column_headers[i + diag_offset], 0) for i in range(len(actual_table) - 1 - diag_offset) if i + diag_offset < len(column_headers))
-            prev_diag_sum = sum(actual_table[i].get(column_headers[i + diag_offset - 1], 0) for i in range(len(actual_table) - 1 - diag_offset) if i + diag_offset - 1 < len(column_headers))
+            curr_diag_sum = sum(
+                _val(actual_table[i], column_headers[i + diag_offset])
+                for i in range(len(actual_table) - 1 - diag_offset)
+                if i + diag_offset < len(column_headers)
+            )
+            prev_diag_sum = sum(
+                _val(actual_table[i], column_headers[i + diag_offset - 1])
+                for i in range(len(actual_table) - 1 - diag_offset)
+                if i + diag_offset - 1 < len(column_headers)
+            )
             if prev_diag_sum > 0:
                 churn = 1 - (curr_diag_sum / prev_diag_sum)
                 churn_rate_df.loc[churn_rate_df["Когорты"] == "ВСЕГО", new_columns[period_idx]] = f"{churn * 100:.2f}%"
