@@ -8,16 +8,17 @@ import data_loader
 import ui
 
 
+def get_date_range() -> tuple[datetime, datetime]:
+    """Get date range from sales data."""
+    try:
+        return data_loader.get_sales_date_range()
+    except Exception:
+        return datetime(2013, 1, 1), datetime(2014, 12, 31)
+
+
 st.set_page_config(page_title="LTV", layout="wide")
 
 st.title("LTV")
-
-if "initialized" not in st.session_state:
-    if data_loader.check_tables_exist():
-        st.session_state.initialized = True
-    else:
-        data_loader.init_database_from_templates()
-        st.session_state.initialized = True
 
 if "cohort_size_input" not in st.session_state:
     st.session_state.cohort_size_input = 3
@@ -32,13 +33,21 @@ if "prev_num_cohorts" not in st.session_state:
 if "calculation_mode" not in st.session_state:
     st.session_state.calculation_mode = "Cohort Size"
 
+if "initialized" not in st.session_state:
+    if data_loader.check_tables_exist():
+        st.session_state.initialized = True
+    else:
+        data_loader.init_database_from_templates()
+        st.session_state.initialized = True
 
-def get_date_range() -> tuple[datetime, datetime]:
-    """Get date range from sales data."""
-    try:
-        return data_loader.get_sales_date_range()
-    except Exception:
-        return datetime(2013, 1, 1), datetime(2014, 12, 31)
+    start_date, end_date = get_date_range()
+    st.session_state._cohort_params = (
+        start_date, end_date,
+        st.session_state.cohort_size_input,
+        st.session_state.num_cohorts_input,
+        st.session_state.calculation_mode,
+        cohorts.COHORT_TYPE_MONTHS
+    )
 
 
 def main() -> None:

@@ -136,6 +136,19 @@ def init_database_from_templates() -> None:
     load_other_marketing_costs_to_db(clear=True)
 
     populate_clients_from_sales()
+    try:
+        start_date, end_date = get_sales_date_range()
+        import cohorts as coh
+        update_cohorts_in_db(
+            start_date=start_date,
+            end_date=end_date,
+            cohort_type=coh.COHORT_TYPE_MONTHS,
+            cohort_size=3,
+            num_cohorts=8,
+            calculation_mode="Cohort Size"
+        )
+    except Exception:
+        pass
 
 
 def init_database() -> None:
@@ -324,6 +337,21 @@ def load_custom_sales_to_db(uploaded_file) -> None:
     df.to_excel(get_download_data_path("sales_template.xlsx"), index=False)
     load_sales_data_to_db(clear=True, source="download_data")
     populate_clients_from_sales()
+    try:
+        start_date, end_date = get_sales_date_range()
+        import cohorts as coh
+        update_cohorts_in_db(
+            start_date=start_date,
+            end_date=end_date,
+            cohort_type=coh.COHORT_TYPE_MONTHS,
+            cohort_size=3,
+            num_cohorts=8,
+            calculation_mode="Cohort Size"
+        )
+    except Exception:
+        pass
+    st.cache_data.clear()
+    st.session_state._cohort_params = None
 
 
 def load_custom_promotion_costs_to_db(uploaded_file) -> None:
@@ -331,6 +359,7 @@ def load_custom_promotion_costs_to_db(uploaded_file) -> None:
     df = pd.read_excel(uploaded_file)
     df.to_excel(get_download_data_path("promotion_costs_template.xlsx"), index=False)
     load_promotion_costs_to_db(clear=True, source="download_data")
+    st.cache_data.clear()
 
 
 def load_custom_other_marketing_costs_to_db(uploaded_file) -> None:
@@ -338,6 +367,7 @@ def load_custom_other_marketing_costs_to_db(uploaded_file) -> None:
     df = pd.read_excel(uploaded_file)
     df.to_excel(get_download_data_path("other_marketing_costs_template.xlsx"), index=False)
     load_other_marketing_costs_to_db(clear=True, source="download_data")
+    st.cache_data.clear()
 
 
 @st.cache_data(ttl=3600)
