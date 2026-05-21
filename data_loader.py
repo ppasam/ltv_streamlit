@@ -135,9 +135,7 @@ def init_database_from_templates() -> None:
     load_promotion_costs_to_db(clear=True)
     load_other_marketing_costs_to_db(clear=True)
 
-    add_cohort_to_sales()
     populate_clients_from_sales()
-    add_cohort_to_expenses_tables()
 
 
 def init_database() -> None:
@@ -414,97 +412,63 @@ def create_clients_table() -> None:
 def add_cohort_to_sales() -> None:
     """Add cohort column to sales table if not exists and populate it."""
     db_url = get_database_url()
-    conn = psycopg2.connect(db_url)
-    cur = conn.cursor()
-    
-    cur.execute("""
-        SELECT column_name FROM information_schema.columns 
-        WHERE table_name = 'sales' AND column_name = 'cohort'
-    """)
-    exists = cur.fetchone()
-    
-    if not exists:
-        cur.execute("ALTER TABLE sales ADD COLUMN cohort VARCHAR")
-        conn.commit()
-    
-    cur.close()
-    conn.close()
-    
+    engine = create_engine(db_url)
+
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS cohort VARCHAR"))
+
     clients_df = load_clients_from_db()
     if clients_df.empty:
         return
-    
-    client_cohorts = clients_df.set_index("client_id")["cohort"].to_dict()
-    
-    conn = psycopg2.connect(db_url)
-    cur = conn.cursor()
-    
-    for client_id, cohort in client_cohorts.items():
-        if cohort is None:
-            cohort = ""
-        cur.execute("UPDATE sales SET cohort = %s WHERE client_id = %s", (cohort, client_id))
-    
-    conn.commit()
-    cur.close()
-    conn.close()
+
+    cohort_map = clients_df[["client_id", "cohort"]].copy()
+    cohort_map["cohort"] = cohort_map["cohort"].fillna("")
+    cohort_map.to_sql("_tmp_sales_cohorts", engine, if_exists="replace", index=False)
+
+    with engine.begin() as conn:
+        conn.execute(text("""
+            UPDATE sales s
+            SET cohort = t.cohort
+            FROM _tmp_sales_cohorts t
+            WHERE s.client_id = t.client_id
+        """))
+        conn.execute(text("DROP TABLE IF EXISTS _tmp_sales_cohorts"))
 
 
 def add_cohort_to_expenses_tables() -> None:
     """Add cohort column to promotion_costs and other_marketing_costs tables."""
     db_url = get_database_url()
-    conn = psycopg2.connect(db_url)
-    cur = conn.cursor()
-    
+    engine = create_engine(db_url)
+
     tables = ["promotion_costs", "other_marketing_costs"]
-    
+
     for table in tables:
-        cur.execute(f"""
-            SELECT column_name FROM information_schema.columns 
-            WHERE table_name = '{table}' AND column_name = 'cohort'
-        """)
-        exists = cur.fetchone()
-        
-        if not exists:
-            cur.execute(f"ALTER TABLE {table} ADD COLUMN cohort VARCHAR")
-    
-    conn.commit()
-    
+        with engine.begin() as conn:
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS cohort VARCHAR"))
+
     cohorts_df = load_cohorts_from_db()
     if cohorts_df.empty:
         return
-    
+
+    cohorts_df = cohorts_df.copy()
+    cohorts_df["date_start"] = pd.to_datetime(cohorts_df["date_start"])
+    cohorts_df["date_end"] = pd.to_datetime(cohorts_df["date_end"])
+
     for table in tables:
-        cur.execute(f"SELECT channels, expenses_date, costs FROM {table}")
-        rows = cur.fetchall()
-        
-        for row in rows:
-            channels, expenses_date, _ = row
-            if not expenses_date:
-                continue
-            
-            cohort_match = ""
-            for _, coh_row in cohorts_df.iterrows():
-                date_start = coh_row["date_start"]
-                date_end = coh_row["date_end"]
-                if isinstance(date_start, str):
-                    date_start = datetime.strptime(date_start, '%Y-%m-%d').date()
-                if isinstance(date_end, str):
-                    date_end = datetime.strptime(date_end, '%Y-%m-%d').date()
-                if isinstance(expenses_date, str):
-                    expenses_date_dt = datetime.strptime(expenses_date, '%Y-%m-%d').date()
-                else:
-                    expenses_date_dt = expenses_date
-                
-                if date_start <= expenses_date_dt <= date_end:
-                    cohort_match = coh_row["cohort"]
-                    break
-            
-            cur.execute(f"UPDATE {table} SET cohort = %s WHERE channels = %s AND expenses_date = %s", 
-                       (cohort_match, channels, expenses_date))
-    
-    conn.commit()
-    cur.close()
-    conn.close()
+        df = pd.read_sql(f"SELECT * FROM {table}", db_url)
+        if df.empty:
+            continue
+
+        def assign_cohort(expenses_date):
+            if pd.isna(expenses_date):
+                return ""
+            ed = pd.to_datetime(expenses_date)
+            mask = (cohorts_df["date_start"] <= ed) & (ed <= cohorts_df["date_end"])
+            matching = cohorts_df[mask]
+            return matching.iloc[0]["cohort"] if not matching.empty else ""
+
+        df["cohort"] = df["expenses_date"].apply(assign_cohort)
+        df.to_sql(table, engine, if_exists="replace", index=False)
 
 
 def save_clients_data(df: pd.DataFrame) -> None:
