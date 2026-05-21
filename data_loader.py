@@ -327,13 +327,15 @@ def load_sales_from_db(start_date: Optional[datetime] = None,
         populate_clients_from_sales()
 
     if start_date and end_date:
+        sd = start_date.strftime('%Y-%m-%d')
+        ed = end_date.strftime('%Y-%m-%d')
         raw_df = pd.read_sql(
-            text("""
+            f"""
                 SELECT purchase_date, order_id, order_price, cost,
                        client_id, acquisition_channel, cohort
                 FROM sales
-                WHERE purchase_date >= :start_date AND purchase_date <= :end_date
-            """).bindparams(start_date=start_date, end_date=end_date),
+                WHERE purchase_date >= '{sd}' AND purchase_date <= '{ed}'
+            """,
             engine
         )
     else:
