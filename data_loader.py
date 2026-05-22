@@ -390,9 +390,13 @@ def get_sales_date_range() -> Tuple[datetime, datetime]:
     if "Date" in df.columns:
         min_date = df["Date"].min()
         max_date = df["Date"].max()
+        # Convert to datetime.datetime if needed
         if hasattr(min_date, 'date'):
+            # It's already a datetime.datetime
             return min_date, max_date
-    return datetime(2024, 1, 1), datetime(2025, 12, 31)
+        else:
+            # It's a datetime.date, convert to datetime.datetime
+            return datetime.combine(min_date, datetime.min.time()), datetime.combine(max_date, datetime.min.time())
     return datetime(2024, 1, 1), datetime(2025, 12, 31)
 
 
