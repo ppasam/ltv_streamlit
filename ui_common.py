@@ -46,17 +46,17 @@ def render_sidebar(start_date: datetime, end_date: datetime) -> tuple:
     with col_start:
         selected_start_date = st.date_input(
             "Start Date",
-            value=start_date.date(),
-            min_value=start_date.date(),
-            max_value=end_date.date(),
+            value=start_date,
+            min_value=start_date,
+            max_value=end_date,
             key="start_date_input"
         )
     with col_end:
         selected_end_date = st.date_input(
             "End Date",
-            value=end_date.date(),
-            min_value=start_date.date(),
-            max_value=end_date.date(),
+            value=end_date,
+            min_value=start_date,
+            max_value=end_date,
             key="end_date_input"
         )
 
