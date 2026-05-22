@@ -57,7 +57,7 @@ Priority: `st.secrets["DATABASE_URL"]` → `os.environ["DATABASE_URL"]` → loca
 - `other_marketing_costs_template.xlsx` (expenses_date column)
 → Supabase.
 
-**Git:** Push directly to `main`. Use tags for releases (e.g., `v2.0.4`).
+**Git & CI:** Push directly to `main`. Use tags for releases (e.g., `v2.0.5`). GitHub Actions workflow runs tests on push/pull request (see `.github/workflows/test.yml`).
 
 ## Gotchas
 
