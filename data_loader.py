@@ -378,11 +378,18 @@ def get_sales_date_range() -> Tuple[datetime, datetime]:
         if not result_df.empty:
             min_date = result_df["min_date"].iloc[0]
             max_date = result_df["max_date"].iloc[0]
-            if isinstance(min_date, str):
-                min_date = datetime.strptime(min_date.split(' ')[0], '%Y-%m-%d')
-            if isinstance(max_date, str):
-                max_date = datetime.strptime(max_date.split(' ')[0], '%Y-%m-%d')
-            return min_date, max_date
+        if isinstance(min_date, str):
+            min_date = datetime.strptime(min_date.split(' ')[0], '%Y-%m-%d')
+        if isinstance(max_date, str):
+            max_date = datetime.strptime(max_date.split(' ')[0], '%Y-%m-%d')
+        # Ensure we return datetime.datetime objects
+        if hasattr(min_date, 'date') and not hasattr(min_date, 'hour'):
+            # It's a date object, convert to datetime
+            min_date = datetime.combine(min_date, datetime.min.time())
+        if hasattr(max_date, 'date') and not hasattr(max_date, 'hour'):
+            # It's a date object, convert to datetime
+            max_date = datetime.combine(max_date, datetime.min.time())
+        return min_date, max_date
     except Exception:
         pass
 
@@ -391,12 +398,13 @@ def get_sales_date_range() -> Tuple[datetime, datetime]:
         min_date = df["Date"].min()
         max_date = df["Date"].max()
         # Convert to datetime.datetime if needed
-        if hasattr(min_date, 'date'):
-            # It's already a datetime.datetime
-            return min_date, max_date
-        else:
-            # It's a datetime.date, convert to datetime.datetime
-            return datetime.combine(min_date, datetime.min.time()), datetime.combine(max_date, datetime.min.time())
+        if hasattr(min_date, 'date') and not hasattr(min_date, 'hour'):
+            # It's a date object, convert to datetime
+            min_date = datetime.combine(min_date, datetime.min.time())
+        if hasattr(max_date, 'date') and not hasattr(max_date, 'hour'):
+            # It's a date object, convert to datetime
+            max_date = datetime.combine(max_date, datetime.min.time())
+        return min_date, max_date
     return datetime(2024, 1, 1), datetime(2025, 12, 31)
 
 
