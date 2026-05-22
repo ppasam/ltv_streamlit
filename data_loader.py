@@ -392,8 +392,8 @@ def get_sales_date_range() -> Tuple[datetime, datetime]:
         max_date = df["Date"].max()
         if hasattr(min_date, 'date'):
             return min_date, max_date
-        return datetime(2013, 1, 1), datetime(2014, 12, 31)
-    return datetime(2013, 1, 1), datetime(2014, 12, 31)
+    return datetime(2024, 1, 1), datetime(2025, 12, 31)
+    return datetime(2024, 1, 1), datetime(2025, 12, 31)
 
 
 def check_database_connection() -> bool:

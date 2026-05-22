@@ -13,7 +13,7 @@ def get_date_range() -> tuple[datetime, datetime]:
     try:
         return data_loader.get_sales_date_range()
     except Exception:
-        return datetime(2013, 1, 1), datetime(2014, 12, 31)
+        return datetime(2024, 1, 1), datetime(2025, 12, 31)
 
 
 st.set_page_config(page_title="LTV", layout="wide")
