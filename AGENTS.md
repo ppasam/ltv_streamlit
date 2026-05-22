@@ -51,6 +51,12 @@ Priority: `st.secrets["DATABASE_URL"]` → `os.environ["DATABASE_URL"]` → loca
 - Ports: `5432:5432`
 - Streamlit service connects via: `postgresql://ltv_user:ltv_pass@postgres:5432/ltv_db`
 
+**Template Initialization:** On first run, `check_tables_exist()` checks for `sales` + `clients` tables. If missing, `init_database_from_templates()` loads 3 default template files from `data/templates_data/`:
+- `sales_template.xlsx` (purchase_date column)
+- `promotion_costs_template.xlsx` (expenses_date column)
+- `other_marketing_costs_template.xlsx` (expenses_date column)
+→ Supabase.
+
 **Git:** Push directly to `main`. Use tags for releases (e.g., `v2.0.4`).
 
 ## Gotchas
